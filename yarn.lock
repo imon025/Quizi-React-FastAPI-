@@ -217,10 +217,10 @@
     "@babel/helper-validator-identifier" "^7.22.5"
     to-fast-properties "^2.0.0"
 
-"@esbuild/linux-x64@0.18.12":
+"@esbuild/win32-x64@0.18.12":
   version "0.18.12"
-  resolved "https://registry.npmjs.org/@esbuild/linux-x64/-/linux-x64-0.18.12.tgz"
-  integrity sha512-OrNJMGQbPaVyHHcDF8ybNSwu7TDOfX8NGpXCbetwOSP6txOJiWlgQnRymfC9ocR1S0Y5PW0Wb1mV6pUddqmvmQ==
+  resolved "https://registry.npmjs.org/@esbuild/win32-x64/-/win32-x64-0.18.12.tgz"
+  integrity sha512-O0UYQVkvfM/jO8a4OwoV0mAKSJw+mjWTAd1MJd/1FCX6uiMdLmMRPK/w6e9OQ0ob2WGxzIm9va/KG0Ja4zIOgg==
 
 "@eslint-community/eslint-utils@^4.2.0":
   version "4.4.0"
