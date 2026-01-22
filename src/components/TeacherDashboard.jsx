@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Home,
   BarChart3,
@@ -38,45 +38,127 @@ import "./dashboard.css";
 import { useTheme } from "../context/ThemeContext";
 
 // Helper Component for Bar Chart
-const BarChart = ({ data, labels, color }) => (
-  <div className="flex items-end gap-2 h-40 w-full px-4">
-    {data.map((val, i) => (
-      <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
-        <div
-          className={`w-full rounded-t-md transition-all duration-500 hover:opacity-80 relative`}
-          style={{ height: `${(val / (Math.max(...data, 1))) * 100}%`, backgroundColor: color }}
-        >
-          <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-            {val}
-          </div>
-        </div>
-        <span className="text-[10px] text-gray-500 font-bold uppercase truncate w-full text-center">{labels[i]}</span>
+// Helper Component for Bar Chart
+const BarChart = ({ data, labels, color }) => {
+  const max = Math.max(...data, 1);
+  return (
+    <div className="flex items-end gap-2 h-40 w-full relative mb-6">
+      {/* Grid Lines */}
+      <div className="absolute inset-x-0 top-0 h-full flex flex-col justify-between pointer-events-none opacity-[0.03] dark:opacity-[0.05]">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="border-t border-current w-full"></div>
+        ))}
       </div>
-    ))}
-  </div>
-);
 
-// Helper Component for Line Chart (simulated with bars for simplicity and consistency)
-const MiniLineChart = ({ data, labels }) => (
-  <div className="flex items-end gap-1 h-40 w-full px-4">
-    {data.map((val, i) => (
-      <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
-        <div
-          className="w-full bg-indigo-500/20 rounded-t-sm relative border-t-2 border-indigo-400"
-          style={{ height: `${(val / (Math.max(...data, 1))) * 100}%` }}
-        >
-          <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-            {val} Attempts
+      {data.map((val, i) => (
+        <div key={i} className="flex-1 flex flex-col items-center gap-2 group z-10 h-full justify-end">
+          <div
+            className={`w-full rounded-t-lg transition-all duration-700 hover:opacity-80 relative shadow-sm`}
+            style={{
+              height: `${(val / max) * 100}%`,
+              backgroundColor: val >= 0 ? color : 'transparent',
+              minHeight: val > 0 ? '4px' : '0'
+            }}
+          >
+            {val > 0 && (
+              <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity font-bold shadow-xl border border-slate-700 whitespace-nowrap z-50">
+                {val} Results
+              </div>
+            )}
           </div>
+          <span className="text-[8px] md:text-[10px] text-slate-500 font-bold uppercase truncate w-full text-center absolute -bottom-6">{labels[i]}</span>
         </div>
-        <span className="text-[10px] text-gray-500 font-bold uppercase">{labels[i]}</span>
+      ))}
+    </div>
+  );
+};
+
+// Helper Component for Line Chart
+const MiniLineChart = ({ data, labels }) => {
+  const max = Math.max(...data, 1);
+  const padding = 10; // Padding inside SVG
+
+  // Adjusted points to fit within padded viewBox
+  const points = data.map((val, i) => {
+    const x = padding + (i / (data.length - 1)) * (100 - 2 * padding);
+    const y = padding + (100 - 2 * padding) - (val / max) * (100 - 2 * padding);
+    return `${x},${y}`;
+  });
+
+  const pathD = points.length > 0 ? `M ${points[0]} L ${points.slice(1).join(' L ')}` : '';
+  const areaD = points.length > 0 ? `${pathD} V 90 H ${padding} Z` : '';
+
+  return (
+    <div className="h-44 w-full flex flex-col relative">
+      {/* Grid Lines */}
+      <div className="absolute inset-0 h-40 flex flex-col justify-between pointer-events-none opacity-[0.03] dark:opacity-[0.05]">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="border-t border-indigo-400 w-full"></div>
+        ))}
       </div>
-    ))}
-  </div>
-);
+
+      <div className="h-40 relative">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full overflow-visible">
+          <defs>
+            <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#4f46e5" stopOpacity="0.2" />
+              <stop offset="100%" stopColor="#4f46e5" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+
+          <path
+            d={areaD}
+            fill="url(#areaGradient)"
+            className="transition-all duration-1000"
+          />
+
+          <path
+            d={pathD}
+            fill="none"
+            stroke="#4f46e5"
+            strokeWidth="2"
+            vectorEffect="non-scaling-stroke"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="transition-all duration-1000"
+          />
+
+          {data.map((val, i) => {
+            const [cx, cy] = points[i].split(',');
+            return (
+              <g key={i} className="group">
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r="2"
+                  fill="#4f46e5"
+                  className="transition-all duration-300 cursor-pointer"
+                />
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r="10"
+                  fill="transparent"
+                  className="cursor-pointer"
+                >
+                  <title>{val} Attempts</title>
+                </circle>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      <div className="flex justify-between px-2">
+        {labels.map((l, i) => (
+          <span key={i} className="text-[8px] md:text-[10px] text-slate-500 font-bold uppercase tracking-tighter">{l}</span>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 export default function TeacherDashboard({ teacherData, onLogout }) {
-  const [activeTab, setActiveTab] = useState(localStorage.getItem("teacher_activeTab") || "overview");
+  const [activeTab, setActiveTab] = useState("overview");
   const [selectedCourse, setSelectedCourse] = useState(() => {
     const saved = localStorage.getItem("teacher_selectedCourse");
     return saved && saved !== "undefined" ? JSON.parse(saved) : null;
@@ -86,6 +168,17 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
     return saved && saved !== "undefined" ? JSON.parse(saved) : null;
   });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const notifRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [notifRef]);
 
   // Removed localStorage persistence for activeTab
   const [myCourses, setMyCourses] = useState([]);
@@ -126,10 +219,6 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const [bulkType, setBulkType] = useState(localStorage.getItem("teacher_bulkType") || 'mcq');
-
-  useEffect(() => {
-    localStorage.setItem("teacher_activeTab", activeTab);
-  }, [activeTab]);
 
   useEffect(() => {
     localStorage.setItem("teacher_selectedCourse", JSON.stringify(selectedCourse));
@@ -196,10 +285,7 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("teacher_activeTab");
     localStorage.removeItem("teacher_selectedCourse");
-    localStorage.removeItem("teacher_selectedQuiz");
-    localStorage.removeItem("teacher_bulkType");
     onLogout();
   };
 
@@ -1002,13 +1088,24 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <button className="hidden sm:block btn-primary px-4 py-2 rounded-lg transition text-sm font-bold shadow-lg shadow-indigo-500/20 whitespace-nowrap" onClick={() => setShowCreateCourse(true)}>
+              <span className="inline-flex items-center gap-2">
+                <PlusCircle size={16} />
+                <span className="leading-none">Create Course</span>
+              </span>
+            </button>
             {/* Notification Bell */}
-            <div className="relative">
+            <div className="relative" ref={notifRef}>
               <button
                 className="p-3 btn-secondary rounded-xl relative"
                 onClick={() => setShowNotifications(!showNotifications)}
               >
-                {notifications.some(n => !n.is_read) ? <BellDot className="text-indigo-500" size={20} /> : <Bell size={20} />}
+                {notifications.some(n => !n.is_read) ? (
+                  <>
+                    <BellDot className="text-indigo-500" size={20} />
+                    <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-slate-900 animate-pulse"></span>
+                  </>
+                ) : <Bell size={20} />}
               </button>
 
               {showNotifications && (
@@ -1040,12 +1137,6 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                 </div>
               )}
             </div>
-            <button className="hidden sm:block btn-primary px-4 py-2 rounded-lg transition text-sm font-bold shadow-lg shadow-indigo-500/20 whitespace-nowrap" onClick={() => setShowCreateCourse(true)}>
-              <span className="inline-flex items-center gap-2">
-                <PlusCircle size={16} />
-                <span className="leading-none">Create Course</span>
-              </span>
-            </button>
           </div>
         </div>
 
@@ -1057,11 +1148,21 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
             const last7Days = [...Array(7)].map((_, i) => {
               const d = new Date();
               d.setDate(d.getDate() - i);
-              return d.toISOString().split('T')[0];
+              const year = d.getFullYear();
+              const month = String(d.getMonth() + 1).padStart(2, '0');
+              const day = String(d.getDate()).padStart(2, '0');
+              return `${year}-${month}-${day}`;
             }).reverse();
 
             const engagementData = last7Days.map(date =>
-              allResults.filter(r => r.completed_at.startsWith(date)).length
+              allResults.filter(r => {
+                if (!r.completed_at) return false;
+                const d = new Date(r.completed_at);
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}` === date;
+              }).length
             );
             const engagementLabels = last7Days.map(date => {
               const d = new Date(date);
@@ -1092,18 +1193,21 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                     value={new Set(allResults.map(r => r.student_id)).size}
                     trend="Unique enrolled"
                     icon={<Users size={24} />}
+                    onClick={() => setActiveTab("students")}
                   />
                   <StatCard
                     title="Live Courses"
                     value={myCourses.length}
                     trend="Active"
                     icon={<Layers size={24} />}
+                    onClick={() => setActiveTab("courses")}
                   />
                   <StatCard
                     title="Quizzes Held"
                     value={allResults.length}
                     trend="Total attempts"
                     icon={<FileText size={24} />}
+                    onClick={() => setActiveTab("all-quizzes")}
                   />
                   <StatCard
                     title="Avg. Score"
@@ -1113,6 +1217,7 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                     }
                     trend="Class performance"
                     icon={<UserCheck size={24} />}
+                    onClick={() => setActiveTab("quiz-results")}
                   />
                 </div>
 
@@ -2101,7 +2206,7 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
       {showAddQuestion && (
         <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[200] p-4 overflow-y-auto">
           <div className="modal-content p-8 rounded-2xl w-full max-w-6xl shadow-2xl my-8 relative flex flex-col lg:flex-row gap-12">
-            <button className="absolute top-6 right-6 text-slate-400 hover:text-white transition" onClick={() => setShowAddQuestion(false)}><X size={24} /></button>
+            <button className="absolute top-6 right-6 text-slate-400 hover:text-slate-900 dark:hover:text-white transition" onClick={() => setShowAddQuestion(false)}><X size={24} /></button>
 
             {/* Editor Side */}
             <div className="flex-1 flex flex-col gap-6">
@@ -2120,7 +2225,7 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                   <div>
                     <label className="text-xs font-black uppercase tracking-widest text-indigo-500 mb-2 block">Type</label>
                     <select
-                      className="w-full input-field p-4 rounded-xl font-bold bg-slate-900 border-none text-white focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
+                      className="w-full input-field p-4 rounded-xl font-bold bg-slate-100 dark:bg-slate-900 border-none text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
                       value={newQuestion.question_type || 'mcq'}
                       onChange={(e) => {
                         const type = e.target.value;
@@ -2635,7 +2740,7 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
       {showEditQuestion && editingQuestion && (
         <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[200] p-4 overflow-y-auto">
           <div className="modal-content p-8 rounded-2xl w-full max-w-6xl shadow-2xl my-8 relative flex flex-col lg:flex-row gap-12">
-            <button className="absolute top-6 right-6 text-slate-400 hover:text-white transition" onClick={() => setShowEditQuestion(false)}><X size={24} /></button>
+            <button className="absolute top-6 right-6 text-slate-400 hover:text-slate-900 dark:hover:text-white transition" onClick={() => setShowEditQuestion(false)}><X size={24} /></button>
 
             {/* Editor Side */}
             <div className="flex-1 flex flex-col gap-6">
@@ -3105,9 +3210,12 @@ function SidebarItem({ icon, label, active, onClick }) {
   );
 }
 
-function StatCard({ title, value, trend, icon }) {
+function StatCard({ title, value, trend, icon, onClick }) {
   return (
-    <div className="stat-card">
+    <div
+      className={`stat-card ${onClick ? 'cursor-pointer hover:border-indigo-500' : ''}`}
+      onClick={onClick}
+    >
       <div className="flex flex-col">
         <p className="stat-title">{title}</p>
         <p className="stat-value">{value}</p>

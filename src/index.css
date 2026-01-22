@@ -5,14 +5,14 @@
 @tailwind utilities;
 
 :root[data-theme='light'] {
-  --primary: #f1f5f9;
-  --secondary: #0f172a;
-  --dimWhite: #64748b;
-  --dimBlue: rgba(30, 41, 59, 0.05);
-  --bg-primary: #e2e8f0;
-  --text-primary: #1e293b;
-  --card-bg: #f8fafc;
-  --border-color: #cbd5e1;
+  --primary: #ffffff;
+  --secondary: #4f46e5;
+  --dimWhite: #475569;
+  --dimBlue: rgba(79, 70, 229, 0.05);
+  --bg-primary: #f8fafc;
+  --text-primary: #0f172a;
+  --card-bg: #ffffff;
+  --border-color: #e2e8f0;
 }
 
 :root[data-theme='dark'] {

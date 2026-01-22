@@ -103,6 +103,29 @@
   border-top: 1px solid var(--border-color);
 }
 
+/* Light Theme Adjustments */
+:root[data-theme='light'] .sidebar-item {
+  color: #64748b;
+}
+
+:root[data-theme='light'] .sidebar-item:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+:root[data-theme='light'] .sidebar-item.active {
+  background: rgba(79, 70, 229, 0.08);
+  color: #4f46e5;
+}
+
+:root[data-theme='light'] .stat-title {
+  color: #64748b;
+}
+
+:root[data-theme='light'] .chart-placeholder {
+  color: #475569;
+}
+
 /* MAIN */
 .main {
   flex: 1;
@@ -155,9 +178,10 @@
 
 /* NOTIFICATIONS DROPDOWN */
 .dropdown-card {
-  background: var(--card-bg); /* Ensure solid background */
+  background: var(--card-bg);
+  /* Ensure solid background */
   border: 1px solid var(--border-color);
-  box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
 }
 
 

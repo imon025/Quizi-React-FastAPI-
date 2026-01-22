@@ -34,47 +34,111 @@ import "./dashboard.css";
 import { useTheme } from "../context/ThemeContext";
 
 // Helper Component for Bar Chart
-const BarChart = ({ data, labels, color }) => (
-  <div className="flex items-end gap-2 h-40 w-full px-4">
-    {data.map((val, i) => (
-      <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
-        <div
-          className="w-full rounded-t-lg transition-all duration-500 hover:opacity-80 relative"
-          style={{ height: `${(val / (Math.max(...data, 1))) * 100}%`, backgroundColor: color }}
-        >
-          <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-            {val}
-          </div>
-        </div>
-        <span className="text-[10px] text-gray-500 font-bold uppercase truncate w-full text-center">{labels[i]}</span>
+const BarChart = ({ data, labels, color }) => {
+  const max = Math.max(...data, 1);
+  return (
+    <div className="flex items-end gap-2 h-40 w-full relative mb-6 text-slate-500">
+      {/* Grid Lines */}
+      <div className="absolute inset-x-0 top-0 h-full flex flex-col justify-between pointer-events-none opacity-[0.03] dark:opacity-[0.05]">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="border-t border-current w-full"></div>
+        ))}
       </div>
-    ))}
-  </div>
-);
+
+      {data.map((val, i) => (
+        <div key={i} className="flex-1 flex flex-col items-center gap-2 group z-10 h-full justify-end">
+          <div
+            className={`w-full rounded-t-lg transition-all duration-700 hover:opacity-80 relative shadow-sm`}
+            style={{
+              height: `${(val / max) * 100}%`,
+              backgroundColor: val >= 0 ? color : 'transparent',
+              minHeight: val > 0 ? '4px' : '0'
+            }}
+          >
+            {val > 0 && (
+              <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity font-bold shadow-xl border border-slate-700 whitespace-nowrap z-50">
+                {val} Attempts
+              </div>
+            )}
+          </div>
+          <span className="text-[8px] md:text-[10px] font-bold uppercase truncate w-full text-center absolute -bottom-6">{labels[i]}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 // Helper Component for Line Chart
-const MiniLineChart = ({ data, labels }) => (
-  <div className="flex items-end gap-1 h-40 w-full px-4">
-    {data.map((val, i) => (
-      <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
-        <div
-          className="w-full bg-indigo-500/20 rounded-t-sm relative border-t-2 border-indigo-400"
-          style={{ height: `${(val / (Math.max(...data, 1))) * 100}%` }}
-        >
-          <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-            {val}%
-          </div>
-        </div>
-        <span className="text-[10px] text-gray-500 font-bold uppercase w-full text-center truncate">{labels[i]}</span>
+const MiniLineChart = ({ data, labels }) => {
+  const max = Math.max(...data, 1);
+  const padding = 10;
+
+  const points = data.map((val, i) => {
+    const x = padding + (i / Math.max(data.length - 1, 1)) * (100 - 2 * padding);
+    const y = padding + (100 - 2 * padding) - (val / max) * (100 - 2 * padding);
+    return `${x},${y}`;
+  });
+
+  const pathD = points.length > 0 ? `M ${points[0]} L ${points.slice(1).join(' L ')}` : '';
+  const areaD = points.length > 0 ? `${pathD} V 90 H ${padding} Z` : '';
+
+  return (
+    <div className="h-44 w-full flex flex-col relative text-slate-500">
+      {/* Grid Lines */}
+      <div className="absolute inset-0 h-40 flex flex-col justify-between pointer-events-none opacity-[0.03] dark:opacity-[0.05]">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="border-t border-indigo-400 w-full"></div>
+        ))}
       </div>
-    ))}
-  </div>
-);
+
+      <div className="h-40 relative">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full overflow-visible">
+          <defs>
+            <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#4f46e5" stopOpacity="0.2" />
+              <stop offset="100%" stopColor="#4f46e5" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+
+          <path d={areaD} fill="url(#areaGradient)" className="transition-all duration-1000" />
+
+          <path
+            d={pathD}
+            fill="none"
+            stroke="#4f46e5"
+            strokeWidth="2"
+            vectorEffect="non-scaling-stroke"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="transition-all duration-1000"
+          />
+
+          {data.map((val, i) => {
+            const [cx, cy] = points[i].split(',');
+            return (
+              <g key={i} className="group">
+                <circle cx={cx} cy={cy} r="2" fill="#4f46e5" className="transition-all duration-300 cursor-pointer" />
+                <circle cx={cx} cy={cy} r="10" fill="transparent" className="cursor-pointer">
+                  <title>{val}%</title>
+                </circle>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      <div className="flex justify-between px-2">
+        {labels.map((l, i) => (
+          <span key={i} className="text-[8px] md:text-[10px] font-bold uppercase tracking-tighter">{l}</span>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 export default function StudentDashboard({ studentData = {}, onLogout }) {
   // Guard early if studentData is totally missing
   if (!studentData) studentData = {};
-  const [activeTab, setActiveTab] = useState(localStorage.getItem("student_activeTab") || "dashboard");
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Removed localStorage persistence for activeTab to reset on login
@@ -150,15 +214,14 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem("student_activeTab");
     localStorage.removeItem("student_selectedQuiz");
     localStorage.removeItem("student_activeQuizQuestions");
     onLogout();
   };
 
   useEffect(() => {
-    localStorage.setItem("student_activeTab", activeTab);
-  }, [activeTab]);
+    localStorage.setItem("student_selectedQuiz", JSON.stringify(selectedQuiz));
+  }, [selectedQuiz]);
 
   useEffect(() => {
     localStorage.setItem("student_selectedQuiz", JSON.stringify(selectedQuiz));
@@ -343,6 +406,7 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
               </div>
             </div>
             <div className="flex items-center gap-4">
+              <button className="hidden sm:block btn-primary px-4 py-2 rounded-xl" onClick={() => setActiveTab("browse")}>Enroll New Course</button>
               {/* Notification Bell */}
               <div className="relative">
                 <button
@@ -374,7 +438,7 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
                             </span>
                             <span className="text-[10px] text-slate-500">{new Date(n.created_at).toLocaleDateString()}</span>
                           </div>
-                          <h4 className="text-sm font-bold text-white mb-1">{n.title}</h4>
+                          <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-1">{n.title}</h4>
                           <p className="text-xs text-gray-400 leading-relaxed">{n.message}</p>
                         </div>
                       )) : (
@@ -384,7 +448,6 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
                   </div>
                 )}
               </div>
-              <button className="hidden sm:block btn-primary px-4 py-2 rounded-xl" onClick={() => setActiveTab("browse")}>Enroll New Course</button>
             </div>
           </div>
         )}
@@ -420,22 +483,35 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
               : 0;
 
             // Weekly Productivity (Last 7 Days Attempts)
-            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-            const productivityData = [0, 0, 0, 0, 0, 0, 0];
-            results.forEach(r => {
-              const date = new Date(r.completed_at);
-              const today = new Date();
-              const diffTime = Math.abs(today - date);
-              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-              if (diffDays <= 7) {
-                productivityData[date.getDay()]++;
-              }
+            const last7Days = [...Array(7)].map((_, i) => {
+              const d = new Date();
+              d.setDate(d.getDate() - i);
+              const year = d.getFullYear();
+              const month = String(d.getMonth() + 1).padStart(2, '0');
+              const day = String(d.getDate()).padStart(2, '0');
+              return `${year}-${month}-${day}`;
+            }).reverse();
+
+            const productivityData = last7Days.map(date =>
+              results.filter(r => {
+                if (!r.completed_at) return false;
+                const d = new Date(r.completed_at);
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}` === date;
+              }).length
+            );
+
+            const dayLabels = last7Days.map(date => {
+              const d = new Date(date);
+              return d.toLocaleDateString('en-US', { weekday: 'short' });
             });
 
             // Quiz Scores (Last 5 attempts)
             const recentResults = results.slice(-5);
-            const scoreData = recentResults.map(r => Math.round((r.score / r.total_marks) * 100));
-            const scoreLabels = recentResults.map((_, i) => `Q${i + 1}`);
+            const scoreData = recentResults.map(r => Math.round((r.score / Math.max(r.total_marks, 1)) * 100));
+            const scoreLabels = recentResults.map((r, i) => r.quiz?.title?.substring(0, 8) + "..." || `Q${i + 1}`);
 
             return (
               <>
@@ -446,24 +522,28 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
                     value={`${progress}%`}
                     trend={`${attemptedCourseIds.size} Courses Started`}
                     icon={<TrendingUp size={24} />}
+                    onClick={() => setActiveTab("reports")}
                   />
                   <StatCard
                     title="Active Courses"
                     value={myCourses.length}
                     trend="Enrolled"
                     icon={<Layers size={24} />}
+                    onClick={() => setActiveTab("my-courses")}
                   />
                   <StatCard
                     title="Pending Quizzes"
                     value={pendingCount}
                     trend="To be attempted"
                     icon={<BookOpen size={24} />}
+                    onClick={() => setActiveTab("quizzes")}
                   />
                   <StatCard
                     title="Average Score"
                     value={`${avgScore}%`}
                     trend={`${passedQuizzes} Passed`}
                     icon={<Award size={24} />}
+                    onClick={() => setActiveTab("attempt-history")}
                   />
                 </div>
 
@@ -476,7 +556,7 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
                         <p className="text-xs text-slate-500">Quiz attempts by day of week</p>
                       </div>
                     </div>
-                    <BarChart data={productivityData} labels={days} color="#6366f1" />
+                    <BarChart data={productivityData} labels={dayLabels} color="#6366f1" />
                   </div>
                   <div className="chart-card">
                     <div className="flex justify-between items-center mb-6">
@@ -669,7 +749,7 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
                             {Math.round((res.score / res.total_marks) * 100)}%
                           </div>
                           <div>
-                            <h4 className="font-semibold text-white">{res.quiz?.title || `Quiz Attempt #${results.length - idx}`}</h4>
+                            <h4 className="font-semibold text-slate-900 dark:text-white">{res.quiz?.title || `Quiz Attempt #${results.length - idx}`}</h4>
                             <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">{res.quiz?.course?.title}</p>
                             <p className="text-xs text-gray-500 mt-1">{new Date(res.completed_at).toLocaleDateString()} • {res.score} / {res.total_marks} Marks</p>
                           </div>
@@ -719,7 +799,7 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
                   <p className="text-xs text-gray-500 uppercase tracking-widest mt-1">Final Score</p>
                 </div>
                 <div className="text-center border-l border-slate-800 pl-8">
-                  <p className="text-3xl font-bold text-white">
+                  <p className="text-3xl font-bold text-slate-900 dark:text-white">
                     {Math.round((resultData.score / resultData.total_marks) * 100)}%
                   </p>
                   <p className="text-xs text-gray-500 uppercase tracking-widest mt-1">Accuracy</p>
@@ -970,7 +1050,7 @@ function QuizGroup({ course, results, onTakeQuiz, statusFilter }) {
                 <BookOpen size={20} />
               </div>
               <div>
-                <h4 className="font-bold text-white text-lg">{quiz.title}</h4>
+                <h4 className="font-bold text-slate-900 dark:text-white text-lg">{quiz.title}</h4>
                 <div className="flex items-center gap-3 text-xs text-gray-400 mt-1">
                   <span className="flex items-center gap-1"><Clock size={12} /> {quiz.duration}m</span>
                   <span className="flex items-center gap-1"><Award size={12} /> {quiz.total_marks} Marks</span>
@@ -1801,7 +1881,7 @@ function QuizSession({ quiz, questions, onFinish }) {
           })}
 
           <div className="mt-8 p-8 bg-indigo-600/10 border border-indigo-500/20 rounded-3xl text-center">
-            <h4 className="text-xl font-bold text-white mb-2">Ready to finish?</h4>
+            <h4 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Ready to finish?</h4>
             <p className="text-slate-400 text-sm mb-6">Please review all your answers before the final submission.</p>
             <button
               onClick={() => handleFinish()}
@@ -1838,9 +1918,12 @@ function QuizSession({ quiz, questions, onFinish }) {
   );
 }
 
-function StatCard({ title, value, trend, icon }) {
+function StatCard({ title, value, trend, icon, onClick }) {
   return (
-    <div className="stat-card">
+    <div
+      className={`stat-card ${onClick ? "cursor-pointer hover:border-indigo-500 transition-all" : ""}`}
+      onClick={onClick}
+    >
       <div className="flex flex-col">
         <p className="stat-title">{title}</p>
         <p className="stat-value">{value}</p>
