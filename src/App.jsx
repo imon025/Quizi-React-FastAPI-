@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Toaster } from "react-hot-toast";
 import AccountForm from "./components/AccountForm";
 import Navbar from "./components/Navbar";
 import ScrollTop from "./components/ScrollTop";
@@ -71,35 +72,36 @@ const App = () => {
     );
   }
 
-  // Conditional rendering based on logged in user
-  if (userType === "student")
-    return <StudentDashboard studentData={loggedInUser} onLogout={handleLogout} />;
-
-  if (userType === "teacher")
-    return <TeacherDashboard teacherData={loggedInUser} onLogout={handleLogout} />;
-
-  // Landing page
   return (
-    <div className="bg-primary text-textPrimary w-full h-full">
-      <Navbar onLoginClick={() => setShowAccount(true)} />
-      <ScrollTop />
-      <div className="container px-5 md:px-10 mx-auto">
-        <Hero onLoginClick={() => setShowAccount(true)} />
-        <div className="flex flex-col xs:flex-row flex-wrap items-center justify-between gap-6 md:gap-2 py-20">
-          <Stats number="3800" title="ACTIVE STUDENT & TEACHER" />
-          <Stats number="230" title="Total Courses" />
-          <Stats number="$230M" title="Total Users" />
-        </div>
-        <Business />
-        <Bill />
-        <PaymentMethod />
-        <Testimonials />
-        <ServiceCard />
-        <Footer />
-      </div>
+    <>
+      <Toaster position="top-center" reverseOrder={false} />
+      {userType === "student" ? (
+        <StudentDashboard studentData={loggedInUser} onLogout={handleLogout} />
+      ) : userType === "teacher" ? (
+        <TeacherDashboard teacherData={loggedInUser} onLogout={handleLogout} />
+      ) : (
+        <div className="bg-primary text-textPrimary w-full h-full">
+          <Navbar onLoginClick={() => setShowAccount(true)} />
+          <ScrollTop />
+          <div className="container px-5 md:px-10 mx-auto">
+            <Hero onLoginClick={() => setShowAccount(true)} />
+            <div className="flex flex-col xs:flex-row flex-wrap items-center justify-between gap-6 md:gap-2 py-20">
+              <Stats number="3800" title="ACTIVE STUDENT & TEACHER" />
+              <Stats number="230" title="Total Courses" />
+              <Stats number="$230M" title="Total Users" />
+            </div>
+            <Business />
+            <Bill />
+            <PaymentMethod />
+            <Testimonials />
+            <ServiceCard />
+            <Footer />
+          </div>
 
-      {showAccount && <AccountForm setShowAccount={setShowAccount} onLogin={handleLogin} />}
-    </div>
+          {showAccount && <AccountForm setShowAccount={setShowAccount} onLogin={handleLogin} />}
+        </div>
+      )}
+    </>
   );
 };
 

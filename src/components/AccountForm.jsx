@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import toast from "react-hot-toast";
 
 const AccountForm = ({ setShowAccount, onLogin }) => {
   const [isLogin, setIsLogin] = useState(true);
@@ -39,7 +40,7 @@ const AccountForm = ({ setShowAccount, onLogin }) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || "Login failed");
 
-        alert(`Login Successful! User type: ${data.user.user_type === 0 ? "Student" : "Teacher"}`);
+        toast.success(`Login Successful! ${data.user.user_type === 0 ? "Student" : "Teacher"}`);
         console.log("Login data:", data);
 
         // Map backend integer type to frontend string type
@@ -48,7 +49,7 @@ const AccountForm = ({ setShowAccount, onLogin }) => {
 
         setShowAccount(false);
       } catch (err) {
-        alert(err.message);
+        toast.error(err.message);
       }
     } else {
       // CREATE ACCOUNT
@@ -59,7 +60,7 @@ const AccountForm = ({ setShowAccount, onLogin }) => {
         !password ||
         (userType === "student" && !studentId)
       ) {
-        alert("Please fill all required fields!");
+        toast.error("Please fill all required fields!");
         return;
       }
 
@@ -84,10 +85,10 @@ const AccountForm = ({ setShowAccount, onLogin }) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || "Account creation failed");
 
-        alert(data.message);
+        toast.success(data.message);
         setIsLogin(true); // switch to login after creation
       } catch (err) {
-        alert(err.message);
+        toast.error(err.message);
       }
     }
   };

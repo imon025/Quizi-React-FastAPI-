@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import "./dashboard.css";
 import { useTheme } from "../context/ThemeContext";
+import toast from "react-hot-toast";
 
 // Helper Component for Bar Chart
 const BarChart = ({ data, labels, color }) => {
@@ -306,14 +307,14 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
           setShowKeyModal(false);
           setActiveTab("quiz-session");
         } else {
-          alert("Failed to load quiz content");
+          toast.error("Failed to load quiz content");
         }
       } else {
         const data = await valRes.json();
-        alert(data.detail || "Invalid key or quiz not available");
+        toast.error(data.detail || "Invalid key or quiz not available");
       }
     } catch (err) {
-      alert("Validation failed");
+      toast.error("Validation failed");
     }
   };
   const handleEnroll = async (e) => {
@@ -330,7 +331,7 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
       });
 
       if (res.ok) {
-        alert("Enrolled successfully!");
+        toast.success("Enrolled successfully!");
         setShowEnrollModal(false);
         setEnrollKey("");
         // Refresh data
@@ -344,10 +345,10 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
         }
       } else {
         const data = await res.json();
-        alert(data.detail || "Enrollment failed");
+        toast.error(data.detail || "Enrollment failed");
       }
     } catch (err) {
-      alert("Enrollment error");
+      toast.error("Enrollment error");
     }
   };
 
@@ -913,13 +914,13 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
                         body: JSON.stringify(cleanUpdates)
                       });
                       if (res.ok) {
-                        alert("Profile updated successfully!");
+                        toast.success("Profile updated successfully!");
                       } else {
                         const err = await res.json();
-                        alert("Update failed: " + (err.detail || "Unknown error"));
+                        toast.error("Update failed: " + (err.detail || "Unknown error"));
                       }
                     } catch (err) {
-                      alert("Network error");
+                      toast.error("Network error");
                     }
                   }} className="flex flex-col gap-6">
 
@@ -976,7 +977,7 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
                       const data = Object.fromEntries(formData.entries());
 
                       if (data.new_password !== data.confirm_new_password) {
-                        alert("New passwords do not match!");
+                        toast.error("New passwords do not match!");
                         return;
                       }
 
@@ -991,14 +992,14 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
                           body: JSON.stringify(data)
                         });
                         if (res.ok) {
-                          alert("Password updated successfully!");
+                          toast.success("Password updated successfully!");
                           e.target.reset();
                         } else {
                           const err = await res.json();
-                          alert("Update failed: " + (err.detail || "Unknown error"));
+                          toast.error("Update failed: " + (err.detail || "Unknown error"));
                         }
                       } catch (err) {
-                        alert("Network error");
+                        toast.error("Network error");
                       }
                     }} className="flex flex-col gap-4">
                       <div>

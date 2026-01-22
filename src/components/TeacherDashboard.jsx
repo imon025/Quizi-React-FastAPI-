@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import "./dashboard.css";
 import { useTheme } from "../context/ThemeContext";
+import toast from "react-hot-toast";
 
 // Helper Component for Bar Chart
 // Helper Component for Bar Chart
@@ -424,7 +425,7 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
         body: JSON.stringify(newCourse)
       });
       if (res.ok) {
-        alert("Course created successfully!");
+        toast.success("Course created successfully!");
         setShowCreateCourse(false);
         setNewCourse({
           title: "",
@@ -439,11 +440,11 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
       } else {
         const errorData = await res.json();
         const errorMessage = errorData.detail || "Failed to create course. Please check your inputs.";
-        alert(`Error: ${errorMessage}`);
+        toast.error(`Error: ${errorMessage}`);
       }
     } catch (err) {
       console.error("Course creation error:", err);
-      alert("Network error: Failed to connect to server.");
+      toast.error("Network error: Failed to connect to server.");
     }
   };
 
@@ -488,7 +489,7 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
 
       if (res.ok) {
         const createdQuiz = await res.json();
-        alert("Quiz created successfully! Now add some questions.");
+        toast.success("Quiz created successfully! Now add some questions.");
         setShowCreateQuiz(false);
         setNewQuiz({
           title: "",
@@ -522,11 +523,11 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
         } else if (Array.isArray(errorData.detail)) {
           errorMessage = errorData.detail.map(err => `${err.loc.join('.')}: ${err.msg}`).join('\n');
         }
-        alert(`Error: ${errorMessage}`);
+        toast.error(`Error: ${errorMessage}`);
       }
     } catch (err) {
       console.error("Quiz creation error:", err);
-      alert("Network error: Failed to connect to server.");
+      toast.error("Network error: Failed to connect to server.");
     }
   };
 
@@ -558,17 +559,17 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
       });
 
       if (response.ok) {
-        alert("Quiz updated successfully!");
+        toast.success("Quiz updated successfully!");
         setShowEditQuiz(false);
         setEditingQuiz(null);
         fetchCourseQuizzes(selectedCourse.id);
       } else {
         const errorData = await response.json();
-        alert("Error: " + (errorData.detail || "Failed to update quiz"));
+        toast.error("Error: " + (errorData.detail || "Failed to update quiz"));
       }
     } catch (err) {
       console.error("Error updating quiz:", err);
-      alert("An error occurred while updating the quiz.");
+      toast.error("An error occurred while updating the quiz.");
     }
   };
 
@@ -581,11 +582,11 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (res.ok) {
-        alert("Quiz deleted successfully!");
+        toast.success("Quiz deleted successfully!");
         fetchCourseQuizzes(selectedCourse.id);
       } else {
         const errorData = await res.json();
-        alert(`Error: ${errorData.detail || "Failed to delete quiz"}`);
+        toast.error(`Error: ${errorData.detail || "Failed to delete quiz"}`);
       }
     } catch (err) {
       console.error("Delete quiz error:", err);
@@ -609,7 +610,7 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
         })
       });
       if (res.ok) {
-        alert("Question added successfully!");
+        toast.success("Question added successfully!");
         setRefreshKey(prev => prev + 1);
         setShowAddQuestion(false);
         setNewQuestion({
@@ -617,11 +618,11 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
         });
       } else {
         const errorData = await res.json();
-        alert(`Error: ${errorData.detail || "Failed to add question"}`);
+        toast.error(`Error: ${errorData.detail || "Failed to add question"}`);
       }
     } catch (err) {
       console.error("Add question error:", err);
-      alert("Network error: Failed to connect to server.");
+      toast.error("Network error: Failed to connect to server.");
     }
   };
 
@@ -638,17 +639,17 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
         body: JSON.stringify(editingQuestion)
       });
       if (res.ok) {
-        alert("Question updated successfully!");
+        toast.success("Question updated successfully!");
         setRefreshKey(prev => prev + 1);
         setShowEditQuestion(false);
         setEditingQuestion(null);
       } else {
         const errorData = await res.json();
-        alert(`Error: ${errorData.detail || "Failed to update question"}`);
+        toast.error(`Error: ${errorData.detail || "Failed to update question"}`);
       }
     } catch (err) {
       console.error("Update question error:", err);
-      alert("Network error: Failed to connect to server.");
+      toast.error("Network error: Failed to connect to server.");
     }
   };
 
@@ -660,11 +661,11 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (res.ok) {
-        alert("Question deleted!");
+        toast.success("Question deleted!");
         setRefreshKey(prev => prev + 1);
       } else {
         const errorData = await res.json();
-        alert(`Error: ${errorData.detail || "Failed to delete question"}`);
+        toast.error(`Error: ${errorData.detail || "Failed to delete question"}`);
       }
     } catch (err) {
       console.error("Delete question error:", err);
@@ -684,12 +685,12 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
         body: JSON.stringify(selectedCourse)
       });
       if (res.ok) {
-        alert("Course updated!");
+        toast.success("Course updated!");
         setShowEditCourse(false);
         fetchMyCourses();
       }
     } catch (err) {
-      alert("Failed to update course");
+      toast.error("Failed to update course");
     }
   };
 
@@ -701,7 +702,7 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (res.ok) {
-        alert("Course deleted successfully!");
+        toast.success("Course deleted successfully!");
         setDeleteCourseId(null);
         setDeleteCountdown(0);
         fetchMyCourses();
@@ -711,7 +712,7 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
         }
       } else {
         const errorData = await res.json();
-        alert(`Error: ${errorData.detail || "Failed to delete course"}`);
+        toast.error(`Error: ${errorData.detail || "Failed to delete course"}`);
       }
     } catch (err) {
       console.error("Delete course error:", err);
@@ -731,7 +732,7 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
         let questions = Array.isArray(json) ? json : (json.questions && Array.isArray(json.questions) ? json.questions : null);
 
         if (!questions) {
-          alert("Invalid JSON format. Expected an array or object with 'questions' array.");
+          toast.error("Invalid JSON format. Expected an array or object with 'questions' array.");
           return;
         }
 
@@ -790,7 +791,7 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
           body: JSON.stringify(mappedQuestions)
         });
         if (res.ok) {
-          alert("Bulk upload successful!");
+          toast.success("Bulk upload successful!");
           setRefreshKey(prev => prev + 1);
         } else {
           const error = await res.json();
@@ -802,11 +803,11 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
               msg += " Error: " + error.detail;
             }
           }
-          alert(msg);
+          toast(msg);
         }
       } catch (err) {
         console.error("JSON parsing error:", err);
-        alert("Invalid JSON format");
+        toast.error("Invalid JSON format");
       }
     };
     reader.readAsText(file);
@@ -850,7 +851,7 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
         console.log("Parsed questions from CSV:", questions);
 
         if (questions.length === 0) {
-          alert("No questions found in CSV. Format: text,option_a,option_b,option_c,option_d,correct_option,point_value");
+          toast.error("No questions found in CSV. Format: text,option_a,option_b,option_c,option_d,correct_option,point_value");
           return;
         }
 
@@ -866,7 +867,7 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
 
         if (res.ok) {
           const data = await res.json();
-          alert(data.message || `Successfully uploaded ${questions.length} questions!`);
+          toast(data.message || `Successfully uploaded ${questions.length} questions!`);
           setRefreshKey(prev => prev + 1);
         } else {
           const error = await res.json();
@@ -878,11 +879,11 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
               msg += " Error: " + error.detail;
             }
           }
-          alert(msg);
+          toast(msg);
         }
       } catch (err) {
         console.error(err);
-        alert("Error parsing CSV file. Ensure it follows the format: text,option_a,option_b,option_c,option_d,correct_option,point_value");
+        toast.error("Error parsing CSV file. Ensure it follows the format: text,option_a,option_b,option_c,option_d,correct_option,point_value");
       }
     };
     reader.readAsText(file);
@@ -967,12 +968,12 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
           if (bulkType === 'true_false') format = "Question | True/False | Points";
           if (bulkType === 'description') format = "Question | Points";
 
-          alert(`UPLOAD FAILED: No valid questions found.\n\nYou selected '${bulkType.toUpperCase()}' format. Ensure your file matches this format:\n\n${format}`);
+          toast.error(`UPLOAD FAILED: No valid questions found.\n\nYou selected '${bulkType.toUpperCase()}' format. Ensure your file matches this format:\n\n${format}`);
           return;
         }
 
         if (!selectedQuiz || !selectedQuiz.id) {
-          alert("Error: No quiz selected. Please select a quiz before uploading.");
+          toast.error("Error: No quiz selected. Please select a quiz before uploading.");
           return;
         }
 
@@ -990,7 +991,7 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
         });
 
         if (res.ok) {
-          alert(`SUCCESS: Uploaded ${questions.length} questions successfully!`);
+          toast.success(`SUCCESS: Uploaded ${questions.length} questions successfully!`);
           setRefreshKey(prev => prev + 1);
         } else {
           let errorDetail = "";
@@ -1000,11 +1001,11 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
           } catch (e) {
             errorDetail = await res.text() || "Unknown server error (non-JSON response)";
           }
-          alert(`UPLOAD FAILED (Status ${res.status}):\n${errorDetail}`);
+          toast.error(`UPLOAD FAILED (Status ${res.status}):\n${errorDetail}`);
         }
       } catch (err) {
         console.error("Upload process error:", err);
-        alert(`NETWORK ERROR: Failed to connect to server.\n\nDetails: ${err.message}\n\nPlease ensure the backend is running at http://127.0.0.1:8000`);
+        toast.error(`NETWORK ERROR: Failed to connect to server.\n\nDetails: ${err.message}\n\nPlease ensure the backend is running at http://127.0.0.1:8000`);
       }
     };
     reader.readAsText(file);
@@ -2074,13 +2075,13 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                       body: JSON.stringify(cleanUpdates)
                     });
                     if (res.ok) {
-                      alert("Profile updated successfully!");
+                      toast.success("Profile updated successfully!");
                     } else {
                       const err = await res.json();
-                      alert("Update failed: " + (err.detail || "Unknown error"));
+                      toast.error("Update failed: " + (err.detail || "Unknown error"));
                     }
                   } catch (err) {
-                    alert("Network error");
+                    toast.error("Network error");
                   }
                 }} className="flex flex-col gap-6">
 
@@ -2137,7 +2138,7 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                     const data = Object.fromEntries(formData.entries());
 
                     if (data.new_password !== data.confirm_new_password) {
-                      alert("New passwords do not match!");
+                      toast.error("New passwords do not match!");
                       return;
                     }
 
@@ -2152,14 +2153,14 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                         body: JSON.stringify(data)
                       });
                       if (res.ok) {
-                        alert("Password updated successfully!");
+                        toast.success("Password updated successfully!");
                         e.target.reset();
                       } else {
                         const err = await res.json();
-                        alert("Update failed: " + (err.detail || "Unknown error"));
+                        toast.error("Update failed: " + (err.detail || "Unknown error"));
                       }
                     } catch (err) {
-                      alert("Network error");
+                      toast.error("Network error");
                     }
                   }} className="flex flex-col gap-4">
                     <div>
@@ -2847,15 +2848,15 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                           });
 
                           if (res.ok) {
-                            alert("GRADING SUCCESS: Data synced to student portal.");
+                            toast.success("GRADING SUCCESS: Data synced to student portal.");
                             setShowGradingModal(false);
                             setSelectedAttempt(null);
                             fetchAllResults(); // Refresh list
                           } else {
-                            alert("GRADNG ERROR: Server rejected the payload.");
+                            toast.error("GRADNG ERROR: Server rejected the payload.");
                           }
                         } catch (err) {
-                          alert("NETWORK ERROR: Connection failed.");
+                          toast.error("NETWORK ERROR: Connection failed.");
                         } finally {
                           setIsGrading(false);
                         }
