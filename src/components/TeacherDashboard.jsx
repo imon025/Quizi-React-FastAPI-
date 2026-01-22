@@ -371,6 +371,19 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
     } catch (err) { console.error(err); }
   };
 
+  const handleDeleteNotification = async (id) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`http://127.0.0.1:8000/notifications/${id}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setNotifications(prev => prev.filter(n => n.id !== id));
+      }
+    } catch (err) { console.error(err); }
+  };
+
   useEffect(() => {
     if (activeTab === "course-detail" && selectedCourse) {
       fetchCourseQuizzes(selectedCourse.id);
@@ -1116,19 +1129,33 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                   </div>
                   <div className="max-h-96 overflow-y-auto">
                     {notifications.length > 0 ? notifications.map(n => (
-                      <div
-                        key={n.id}
-                        className={`p-4 border-b border-slate-100 dark:border-slate-800/50 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition cursor-pointer ${!n.is_read ? 'bg-indigo-500/5' : ''}`}
-                        onClick={() => handleMarkAsRead(n.id)}
-                      >
-                        <div className="flex justify-between items-start mb-1">
-                          <span className={`text-[10px] uppercase font-black tracking-widest px-2 py-0.5 rounded ${n.type === 'quiz' ? 'bg-red-500/20 text-red-500' : 'bg-indigo-500/20 text-indigo-500'}`}>
-                            {n.type}
-                          </span>
-                          <span className="text-[10px] text-slate-400">{new Date(n.created_at).toLocaleDateString()}</span>
+                      <div key={n.id} className="relative group overflow-hidden border-b border-slate-100 dark:border-slate-800/50 last:border-0">
+                        {/* Swipe Container */}
+                        <div className="flex transition-transform duration-300 ease-out hover:-translate-x-16">
+                          <div
+                            className={`flex-1 p-4 cursor-pointer ${!n.is_read ? 'bg-indigo-500/5' : 'bg-white dark:bg-slate-800'}`}
+                            onClick={() => handleMarkAsRead(n.id)}
+                          >
+                            <div className="flex justify-between items-start mb-1">
+                              <span className={`text-[10px] uppercase font-black tracking-widest px-2 py-0.5 rounded ${n.type === 'quiz' ? 'bg-red-500/20 text-red-500' : 'bg-indigo-500/20 text-indigo-500'}`}>
+                                {n.type}
+                              </span>
+                              <span className="text-[10px] text-slate-400">{new Date(n.created_at).toLocaleDateString()}</span>
+                            </div>
+                            <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-1">{n.title}</h4>
+                            <p className="text-xs text-slate-500 dark:text-gray-400 leading-relaxed">{n.message}</p>
+                          </div>
+                          {/* Delete Button (revealed on hover/swipe) */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteNotification(n.id);
+                            }}
+                            className="w-16 bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
+                          >
+                            <X size={18} />
+                          </button>
                         </div>
-                        <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-1">{n.title}</h4>
-                        <p className="text-xs text-slate-500 dark:text-gray-400 leading-relaxed">{n.message}</p>
                       </div>
                     )) : (
                       <div className="p-8 text-center text-slate-500 text-sm">No new notifications</div>

@@ -154,6 +154,7 @@ class ResultResponse(BaseModel):
 
 class NotificationResponse(BaseModel):
     id: int
+    user_id: Optional[int] = None
     title: str
     message: str
     type: str # 'course', 'quiz', 'system'

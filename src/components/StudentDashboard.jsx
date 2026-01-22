@@ -165,6 +165,7 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [fetchError, setFetchError] = useState(null);
+  const notificationRef = useRef(null);
   const [selectedCourseFilter, setSelectedCourseFilter] = useState('all');
   const [selectedQuizStatusFilter, setSelectedQuizStatusFilter] = useState('all');
 
@@ -191,13 +192,25 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
         });
 
         if (!allRes.ok || !myRes.ok) {
-          throw new Error(`API Error: Courses(${allRes.status}), MyCourses(${myRes.status})`);
+          console.error("Critical Fetch Failure:", { all: allRes.status, my: myRes.status });
+          throw new Error(`Critical Data Load Failed (Status: ${allRes.status}/${myRes.status})`);
         }
 
         setCourses(await allRes.json());
         setMyCourses(await myRes.json());
-        if (resultsRes.ok) setResults(await resultsRes.json());
-        if (notifRes.ok) setNotifications(await notifRes.json());
+
+        if (resultsRes.ok) {
+          setResults(await resultsRes.json());
+        } else {
+          console.warn("Results Fetch Failed:", resultsRes.status);
+        }
+
+        if (notifRes.ok) {
+          setNotifications(await notifRes.json());
+        } else {
+          console.warn("Notifications Fetch Failed:", notifRes.status);
+        }
+
         setFetchError(null);
       } catch (err) {
         console.error("Student Dashboard Data Fetch Failure:", err);
@@ -210,7 +223,19 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
 
     // POLLING: Refresh data every 30 seconds
     const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
+
+    // Click outside handler for notifications
+    const handleClickOutside = (event) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, []);
 
   const handleLogout = () => {
@@ -239,6 +264,19 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
         headers: { "Authorization": `Bearer ${token}` }
       });
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+    } catch (err) { console.error(err); }
+  };
+
+  const handleDeleteNotification = async (id) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`http://127.0.0.1:8000/notifications/${id}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setNotifications(prev => prev.filter(n => n.id !== id));
+      }
     } catch (err) { console.error(err); }
   };
 
@@ -420,26 +458,40 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
                 </button>
 
                 {showNotifications && (
-                  <div className="absolute right-0 mt-3 w-80 dropdown-card rounded-2xl z-[300] overflow-hidden">
+                  <div ref={notificationRef} className="absolute right-0 mt-3 w-80 dropdown-card rounded-2xl z-[300] overflow-hidden">
                     <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
                       <h3 className="font-bold text-slate-900 dark:text-white">Notifications</h3>
                       <button className="text-xs text-indigo-500 hover:underline" onClick={() => setShowNotifications(false)}>Close</button>
                     </div>
                     <div className="max-h-96 overflow-y-auto">
                       {notifications.length > 0 ? notifications.map(n => (
-                        <div
-                          key={n.id}
-                          className={`p-4 border-b border-slate-800/50 last:border-0 hover:bg-slate-800/30 transition cursor-pointer ${!n.is_read ? 'bg-indigo-500/5' : ''}`}
-                          onClick={() => handleMarkAsRead(n.id)}
-                        >
-                          <div className="flex justify-between items-start mb-1">
-                            <span className={`text-[10px] uppercase font-black tracking-widest px-2 py-0.5 rounded ${n.type === 'quiz' ? 'bg-red-500/20 text-red-400' : 'bg-indigo-500/20 text-indigo-400'}`}>
-                              {n.type}
-                            </span>
-                            <span className="text-[10px] text-slate-500">{new Date(n.created_at).toLocaleDateString()}</span>
+                        <div key={n.id} className="relative group overflow-hidden border-b border-slate-800/50 last:border-0 bg-white dark:bg-slate-900">
+                          {/* Swipeable Container */}
+                          <div className="flex transition-transform duration-300 ease-out hover:-translate-x-16">
+                            <div
+                              className={`flex-1 p-4 cursor-pointer ${!n.is_read ? 'bg-indigo-500/5' : ''}`}
+                              onClick={() => handleMarkAsRead(n.id)}
+                            >
+                              <div className="flex justify-between items-start mb-1">
+                                <span className={`text-[10px] uppercase font-black tracking-widest px-2 py-0.5 rounded ${n.type === 'quiz' ? 'bg-red-500/20 text-red-400' : 'bg-indigo-500/20 text-indigo-400'}`}>
+                                  {n.type}
+                                </span>
+                                <span className="text-[10px] text-slate-500">{new Date(n.created_at).toLocaleDateString()}</span>
+                              </div>
+                              <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-1">{n.title}</h4>
+                              <p className="text-xs text-gray-400 leading-relaxed">{n.message}</p>
+                            </div>
+                            {/* Delete Button (reveal on hover/swipe) */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteNotification(n.id);
+                              }}
+                              className="w-16 bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
+                            >
+                              <X size={18} />
+                            </button>
                           </div>
-                          <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-1">{n.title}</h4>
-                          <p className="text-xs text-gray-400 leading-relaxed">{n.message}</p>
                         </div>
                       )) : (
                         <div className="p-8 text-center text-slate-500 text-sm">No new notifications</div>
@@ -457,6 +509,17 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
 
 
           {activeTab === "dashboard" && (() => {
+            if (fetchError) {
+              return (
+                <div className="py-20 text-center bg-red-500/5 rounded-[3rem] border-2 border-dashed border-red-500/20">
+                  <ShieldAlert size={48} className="mx-auto mb-4 text-red-400" />
+                  <p className="text-xl font-bold text-red-500">Data Access Error</p>
+                  <p className="text-sm text-red-400 mt-2">{fetchError}</p>
+                  <button onClick={() => window.location.reload()} className="mt-8 btn-primary px-8 py-3 rounded-2xl">Retry Connection</button>
+                </div>
+              );
+            }
+
             // Calculate dynamic data
             const totalAttempts = results.length;
             const passedQuizzes = results.filter(r => (r.score / r.total_marks) >= 0.4).length;

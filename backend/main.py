@@ -173,14 +173,7 @@ def create_course(course: schemas.CourseCreate, current_user: models.User = Depe
     try:
         new_course = models.Course(**course.dict(), teacher_id=current_user.id)
         db.add(new_course)
-        
-        # Create notification
-        notif = models.Notification(
-            title="New Course Available!",
-            message=f"Instructor {current_user.full_name} has published a new course: {course.title}",
-            type="course"
-        )
-        db.add(notif)
+        # Note: No notification here as no students are enrolled yet
         
         db.commit()
         db.refresh(new_course)
@@ -220,13 +213,16 @@ def update_course(course_id: int, course_update: schemas.CourseCreate, current_u
         setattr(course, key, value)
     db.commit()
     
-    # Create notification for update
-    notif = models.Notification(
-        title="Course Updated",
-        message=f"The course '{course.title}' has been updated by the instructor.",
-        type="course"
-    )
-    db.add(notif)
+    # Create notifications for all enrolled students
+    enrollments = db.query(models.Enrollment).filter_by(course_id=course.id).all()
+    for enrollment in enrollments:
+        notif = models.Notification(
+            user_id=enrollment.student_id,
+            title="Course Updated",
+            message=f"The course '{course.title}' has been updated by the instructor.",
+            type="course"
+        )
+        db.add(notif)
     db.commit()
 
     db.refresh(course)
@@ -263,6 +259,16 @@ def enroll_student(course_id: int, enrollment_data: dict, current_user: models.U
         
     enrollment = models.Enrollment(student_id=current_user.id, course_id=course_id)
     db.add(enrollment)
+    
+    # Notify Teacher
+    notif = models.Notification(
+        user_id=course.teacher_id,
+        title="New Student Joined",
+        message=f"Student {current_user.full_name} has enrolled in your course: {course.title}",
+        type="course"
+    )
+    db.add(notif)
+    
     db.commit()
     return {"message": "Successfully enrolled"}
 
@@ -276,13 +282,16 @@ def create_quiz(quiz: schemas.QuizCreate, current_user: models.User = Depends(ge
     new_quiz = models.Quiz(**quiz.dict())
     db.add(new_quiz)
     
-    # Create notification
-    notif = models.Notification(
-        title="New Quiz Posted!",
-        message=f"A new quiz '{quiz.title}' has been added to your course.",
-        type="quiz"
-    )
-    db.add(notif)
+    # Notify all enrolled students
+    enrollments = db.query(models.Enrollment).filter_by(course_id=quiz.course_id).all()
+    for enrollment in enrollments:
+        notif = models.Notification(
+            user_id=enrollment.student_id,
+            title="New Quiz Posted!",
+            message=f"A new quiz '{quiz.title}' has been added to your course: {new_quiz.course.title}",
+            type="quiz"
+        )
+        db.add(notif)
     
     db.commit()
     db.refresh(new_quiz)
@@ -306,13 +315,16 @@ def update_quiz(quiz_id: int, quiz_update: schemas.QuizBase, current_user: model
     
     db.commit()
     
-    # Create notification for update
-    notif = models.Notification(
-        title="Quiz Updated",
-        message=f"The quiz '{quiz.title}' in course '{quiz.course.title}' has been updated.",
-        type="quiz"
-    )
-    db.add(notif)
+    # Notify all enrolled students
+    enrollments = db.query(models.Enrollment).filter_by(course_id=quiz.course_id).all()
+    for enrollment in enrollments:
+        notif = models.Notification(
+            user_id=enrollment.student_id,
+            title="Quiz Updated",
+            message=f"The quiz '{quiz.title}' in course '{quiz.course.title}' has been updated.",
+            type="quiz"
+        )
+        db.add(notif)
     db.commit()
 
     db.refresh(quiz)
@@ -457,10 +469,11 @@ def update_question(question_id: int, question_update: schemas.QuestionBase, cur
         quiz.total_marks = total
         db.commit()
 
-    # Create notification
+    # Notify Teacher
     notif = models.Notification(
+        user_id=quiz.course.teacher_id,
         title="Quiz Content Updated",
-        message=f"A question in one of your quizzes has been updated.",
+        message=f"Quiz '{quiz.title}' content has been updated by the system or another teacher.",
         type="quiz"
     )
     db.add(notif)
@@ -544,6 +557,17 @@ def submit_quiz_result(result: schemas.ResultCreate, current_user: models.User =
     db.add(new_result)
     db.commit()
     db.refresh(new_result)
+    
+    # Notify Teacher of Submission
+    notif = models.Notification(
+        user_id=new_result.quiz.course.teacher_id,
+        title="New Quiz Submission",
+        message=f"Student {current_user.full_name} has submitted an attempt for quiz: {new_result.quiz.title}",
+        type="quiz"
+    )
+    db.add(notif)
+    db.commit()
+    
     return new_result
 
 @app.put("/results/{result_id}/grade")
@@ -609,11 +633,31 @@ def grade_result(result_id: int, payload: dict, current_user: models.User = Depe
     result.score = new_score
     db.commit()
     db.refresh(result)
+
+    # Notify Student of Grading
+    notif = models.Notification(
+        user_id=result.student_id,
+        title="Result Graded",
+        message=f"Your result for quiz '{result.quiz.title}' has been graded. Your score: {result.score}/{result.total_marks}",
+        type="quiz"
+    )
+    db.add(notif)
+    db.commit()
+
     return result
 
 @app.get("/notifications", response_model=List[schemas.NotificationResponse])
-def get_notifications(db: Session = Depends(get_db)):
-    return db.query(models.Notification).order_by(models.Notification.created_at.desc()).limit(20).all()
+def get_notifications(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return db.query(models.Notification).filter(models.Notification.user_id == current_user.id).order_by(models.Notification.created_at.desc()).limit(20).all()
+
+@app.delete("/notifications/{notif_id}")
+def delete_notification(notif_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    notif = db.query(models.Notification).filter(models.Notification.id == notif_id, models.Notification.user_id == current_user.id).first()
+    if notif:
+        db.delete(notif)
+        db.commit()
+        return {"message": "Notification deleted"}
+    raise HTTPException(status_code=404, detail="Notification not found")
 
 @app.post("/notifications/{notif_id}/read")
 def mark_notification_read(notif_id: int, db: Session = Depends(get_db)):
