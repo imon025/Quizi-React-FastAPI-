@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   Search,
+  History,
   Sun,
   Moon,
   Key,
@@ -26,7 +27,8 @@ import {
   ShieldAlert,
   Hash,
   ArrowLeft,
-  ArrowRight
+  ArrowRight,
+  User
 } from "lucide-react";
 import "./dashboard.css";
 import { useTheme } from "../context/ThemeContext";
@@ -69,21 +71,28 @@ const MiniLineChart = ({ data, labels }) => (
   </div>
 );
 
-export default function StudentDashboard({ studentData, onLogout }) {
-  const [activeTab, setActiveTab] = useState(localStorage.getItem("studentActiveTab") || "dashboard");
+export default function StudentDashboard({ studentData = {}, onLogout }) {
+  // Guard early if studentData is totally missing
+  if (!studentData) studentData = {};
+  const [activeTab, setActiveTab] = useState(localStorage.getItem("student_activeTab") || "dashboard");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  useEffect(() => {
-    localStorage.setItem("studentActiveTab", activeTab);
-  }, [activeTab]);
+  // Removed localStorage persistence for activeTab to reset on login
+
   const [courses, setCourses] = useState([]);
   const [myCourses, setMyCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const { theme, toggleTheme } = useTheme();
   const [showKeyModal, setShowKeyModal] = useState(false);
-  const [selectedQuiz, setSelectedQuiz] = useState(null);
+  const [selectedQuiz, setSelectedQuiz] = useState(() => {
+    const saved = localStorage.getItem("student_selectedQuiz");
+    return saved && saved !== "undefined" ? JSON.parse(saved) : null;
+  });
   const [quizKey, setQuizKey] = useState("");
-  const [activeQuizQuestions, setActiveQuizQuestions] = useState(null);
+  const [activeQuizQuestions, setActiveQuizQuestions] = useState(() => {
+    const saved = localStorage.getItem("student_activeQuizQuestions");
+    return saved && saved !== "undefined" ? JSON.parse(saved) : null;
+  });
   const [resultData, setResultData] = useState(null);
   const [results, setResults] = useState([]);
   const [showEnrollModal, setShowEnrollModal] = useState(false);
@@ -91,6 +100,9 @@ export default function StudentDashboard({ studentData, onLogout }) {
   const [enrollKey, setEnrollKey] = useState("");
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [fetchError, setFetchError] = useState(null);
+  const [selectedCourseFilter, setSelectedCourseFilter] = useState('all');
+  const [selectedQuizStatusFilter, setSelectedQuizStatusFilter] = useState('all');
 
   useEffect(() => {
     // Fetch data from backend
@@ -99,19 +111,33 @@ export default function StudentDashboard({ studentData, onLogout }) {
         const token = localStorage.getItem("token");
         const headers = { "Authorization": `Bearer ${token}` };
 
-        const [allRes, myRes, resultsRes, notifRes] = await Promise.all([
+        const results = await Promise.all([
           fetch("http://127.0.0.1:8000/courses/all", { headers }),
-          fetch("http://127.0.0.1:8000/enrollments/my", { headers }),
+          fetch("http://127.0.0.1:8000/courses/my", { headers }),
           fetch("http://127.0.0.1:8000/results/my", { headers }),
           fetch("http://127.0.0.1:8000/notifications", { headers })
         ]);
 
-        if (allRes.ok) setCourses(await allRes.json());
-        if (myRes.ok) setMyCourses(await myRes.json());
+        const [allRes, myRes, resultsRes, notifRes] = results;
+        console.log("Student Dashboard Fetch Results:", {
+          courses: allRes.status,
+          myCourses: myRes.status,
+          results: resultsRes.status,
+          notifications: notifRes.status
+        });
+
+        if (!allRes.ok || !myRes.ok) {
+          throw new Error(`API Error: Courses(${allRes.status}), MyCourses(${myRes.status})`);
+        }
+
+        setCourses(await allRes.json());
+        setMyCourses(await myRes.json());
         if (resultsRes.ok) setResults(await resultsRes.json());
         if (notifRes.ok) setNotifications(await notifRes.json());
+        setFetchError(null);
       } catch (err) {
-        console.error("Failed to fetch data", err);
+        console.error("Student Dashboard Data Fetch Failure:", err);
+        setFetchError(err.message);
       } finally {
         setLoading(false);
       }
@@ -122,6 +148,25 @@ export default function StudentDashboard({ studentData, onLogout }) {
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("student_activeTab");
+    localStorage.removeItem("student_selectedQuiz");
+    localStorage.removeItem("student_activeQuizQuestions");
+    onLogout();
+  };
+
+  useEffect(() => {
+    localStorage.setItem("student_activeTab", activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    localStorage.setItem("student_selectedQuiz", JSON.stringify(selectedQuiz));
+  }, [selectedQuiz]);
+
+  useEffect(() => {
+    localStorage.setItem("student_activeQuizQuestions", JSON.stringify(activeQuizQuestions));
+  }, [activeQuizQuestions]);
 
   const handleMarkAsRead = async (id) => {
     try {
@@ -183,11 +228,14 @@ export default function StudentDashboard({ studentData, onLogout }) {
         setShowEnrollModal(false);
         setEnrollKey("");
         // Refresh data
+        // Refresh data using handleData fetch (or specific endpoints)
         const headers = { "Authorization": `Bearer ${token}` };
-        const myRes = await fetch("http://127.0.0.1:8000/enrollments/my", { headers });
-        const myData = await myRes.json();
-        setMyCourses(myData);
-        setActiveTab("my-courses");
+        const myRes = await fetch("http://127.0.0.1:8000/courses/my", { headers });
+        if (myRes.ok) {
+          const myData = await myRes.json();
+          setMyCourses(myData);
+          setActiveTab("my-courses");
+        }
       } else {
         const data = await res.json();
         alert(data.detail || "Enrollment failed");
@@ -209,528 +257,705 @@ export default function StudentDashboard({ studentData, onLogout }) {
         />
       )}
 
-      {/* Sidebar */}
-      <aside className={`sidebar ${isSidebarOpen ? "open" : ""}`}>
-        <div className="flex justify-between items-center mb-10">
-          <h2 className="sidebar-title mb-0">Quizi</h2>
-          <button className="md:hidden text-gray-400" onClick={toggleSidebar}>
-            <X size={24} />
-          </button>
-        </div>
+      {/* Sidebar - Hide when taking quiz */}
+      {activeTab !== 'quiz-session' && (
+        <aside className={`sidebar ${isSidebarOpen ? "open" : ""}`}>
+          <div className="flex justify-between items-center mb-10">
+            <h2 className="sidebar-title mb-0">Quizi</h2>
+            <button className="md:hidden text-gray-400" onClick={toggleSidebar}>
+              <X size={24} />
+            </button>
+          </div>
 
-        <nav className="sidebar-nav">
-          <SidebarItem
-            icon={<Home size={18} />}
-            label="Dashboard"
-            active={activeTab === "dashboard"}
-            onClick={() => { setActiveTab("dashboard"); setIsSidebarOpen(false); }}
-          />
-          <SidebarItem
-            icon={<Layers size={18} />}
-            label="My Courses"
-            active={activeTab === "my-courses"}
-            onClick={() => { setActiveTab("my-courses"); setIsSidebarOpen(false); }}
-          />
-          <SidebarItem
-            icon={<Search size={18} />}
-            label="Browse Courses"
-            active={activeTab === "browse"}
-            onClick={() => { setActiveTab("browse"); setIsSidebarOpen(false); }}
-          />
-          <SidebarItem
-            icon={<BookOpen size={18} />}
-            label="Quizzes"
-            active={activeTab === "quizzes"}
-            onClick={() => { setActiveTab("quizzes"); setIsSidebarOpen(false); }}
-          />
-          <SidebarItem
-            icon={<BarChart3 size={18} />}
-            label="Reports"
-            active={activeTab === "reports"}
-            onClick={() => { setActiveTab("reports"); setIsSidebarOpen(false); }}
-          />
-        </nav>
+          <nav className="sidebar-nav">
+            <SidebarItem
+              icon={<Home size={18} />}
+              label="Dashboard"
+              active={activeTab === "dashboard"}
+              onClick={() => { setActiveTab("dashboard"); setIsSidebarOpen(false); }}
+            />
+            <SidebarItem
+              icon={<Layers size={18} />}
+              label="My Courses"
+              active={activeTab === "my-courses"}
+              onClick={() => { setActiveTab("my-courses"); setIsSidebarOpen(false); }}
+            />
+            <SidebarItem
+              icon={<Search size={18} />}
+              label="Browse Courses"
+              active={activeTab === "browse"}
+              onClick={() => { setActiveTab("browse"); setIsSidebarOpen(false); }}
+            />
+            <SidebarItem
+              icon={<BookOpen size={18} />}
+              label="Quizzes"
+              active={activeTab === "quizzes"}
+              onClick={() => { setActiveTab("quizzes"); setIsSidebarOpen(false); }}
+            />
+            <SidebarItem
+              icon={<BarChart3 size={18} />}
+              label="Reports"
+              active={activeTab === "reports"}
+              onClick={() => { setActiveTab("reports"); setIsSidebarOpen(false); }}
+            />
+            <SidebarItem
+              icon={<History size={18} />}
+              label="Attempt History"
+              active={activeTab === "attempt-history"}
+              onClick={() => { setActiveTab("attempt-history"); setIsSidebarOpen(false); }}
+            />
+          </nav>
 
 
-        <div className="sidebar-footer">
-          <SidebarItem
-            icon={theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
-            label={theme === 'light' ? "Dark Mode" : "Light Mode"}
-            onClick={toggleTheme}
-          />
-          <SidebarItem
-            icon={<LogOut size={18} />}
-            label="Logout"
-            onClick={onLogout}
-          />
-        </div>
-      </aside>
+          <div className="sidebar-footer">
+            <SidebarItem
+              icon={theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+              label={theme === 'light' ? "Dark Mode" : "Light Mode"}
+              onClick={toggleTheme}
+            />
+            <SidebarItem
+              icon={<User size={18} />}
+              label="Profile"
+              active={activeTab === "profile"}
+              onClick={() => { setActiveTab("profile"); setIsSidebarOpen(false); }}
+            />
+            <SidebarItem
+              icon={<LogOut size={18} />}
+              label="Logout"
+              onClick={handleLogout}
+            />
+          </div>
+        </aside>
+      )}
 
       {/* Main Content */}
       <main className="main">
-        {/* Header */}
-        <div className="header">
-          <div className="flex items-center gap-4">
-            <button className="mobile-toggle" onClick={toggleSidebar}>
-              <Menu size={24} />
-            </button>
-            <div>
-              <h1 className="text-xl md:text-3xl">Welcome back, {studentData.full_name || "Student"}</h1>
-              <p className="header-subtitle mt-1">Ready for your next quiz?</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            {/* Notification Bell */}
-            <div className="relative">
-              <button
-                className="p-3 btn-secondary rounded-xl relative"
-                onClick={() => setShowNotifications(!showNotifications)}
-              >
-                {notifications.some(n => !n.is_read) ? <BellDot className="text-indigo-500" size={20} /> : <Bell size={20} />}
+        {/* Header - Hide when taking quiz */}
+        {activeTab !== 'quiz-session' && (
+          <div className="header">
+            <div className="flex items-center gap-4">
+              <button className="mobile-toggle" onClick={toggleSidebar}>
+                <Menu size={24} />
               </button>
-
-              {showNotifications && (
-                <div className="absolute right-0 mt-3 w-80 dropdown-card rounded-2xl z-[300] overflow-hidden">
-                  <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
-                    <h3 className="font-bold text-slate-900 dark:text-white">Notifications</h3>
-                    <button className="text-xs text-indigo-500 hover:underline" onClick={() => setShowNotifications(false)}>Close</button>
-                  </div>
-                  <div className="max-h-96 overflow-y-auto">
-                    {notifications.length > 0 ? notifications.map(n => (
-                      <div
-                        key={n.id}
-                        className={`p-4 border-b border-slate-800/50 last:border-0 hover:bg-slate-800/30 transition cursor-pointer ${!n.is_read ? 'bg-indigo-500/5' : ''}`}
-                        onClick={() => handleMarkAsRead(n.id)}
-                      >
-                        <div className="flex justify-between items-start mb-1">
-                          <span className={`text-[10px] uppercase font-black tracking-widest px-2 py-0.5 rounded ${n.type === 'quiz' ? 'bg-red-500/20 text-red-400' : 'bg-indigo-500/20 text-indigo-400'}`}>
-                            {n.type}
-                          </span>
-                          <span className="text-[10px] text-slate-500">{new Date(n.created_at).toLocaleDateString()}</span>
-                        </div>
-                        <h4 className="text-sm font-bold text-white mb-1">{n.title}</h4>
-                        <p className="text-xs text-gray-400 leading-relaxed">{n.message}</p>
-                      </div>
-                    )) : (
-                      <div className="p-8 text-center text-slate-500 text-sm">No new notifications</div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-            <button className="hidden sm:block" onClick={() => setActiveTab("browse")}>Enroll New Course</button>
-          </div>
-        </div>
-
-        {activeTab === "dashboard" && (() => {
-          // Calculate dynamic data
-          const totalAttempts = results.length;
-          const passedQuizzes = results.filter(r => (r.score / r.total_marks) >= 0.4).length;
-          const avgScore = totalAttempts > 0
-            ? Math.round((results.reduce((acc, r) => acc + (r.score / r.total_marks), 0) / totalAttempts) * 100)
-            : 0;
-
-          // Pending Quizzes: Check all quizzes in enrolled courses not in results
-          const attemptedQuizIds = new Set(results.map(r => r.quiz_id));
-          let pendingCount = 0;
-          myCourses.forEach(course => {
-            if (course.quizzes) {
-              course.quizzes.forEach(q => {
-                if (!attemptedQuizIds.has(q.id)) pendingCount++;
-              });
-            }
-          });
-
-          // Overall Progress: Passed courses (at least one quiz passed) / Total enrolled
-          // For simplicity, let's use: (courses with at least one attempt) / Total enrolled
-          const attemptedCourseIds = new Set(results.map(r => r.quiz?.course_id));
-          const progress = myCourses.length > 0
-            ? Math.round((attemptedCourseIds.size / myCourses.length) * 100)
-            : 0;
-
-          // Weekly Productivity (Last 7 Days Attempts)
-          const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-          const productivityData = [0, 0, 0, 0, 0, 0, 0];
-          results.forEach(r => {
-            const date = new Date(r.completed_at);
-            const today = new Date();
-            const diffTime = Math.abs(today - date);
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            if (diffDays <= 7) {
-              productivityData[date.getDay()]++;
-            }
-          });
-
-          // Quiz Scores (Last 5 attempts)
-          const recentResults = results.slice(-5);
-          const scoreData = recentResults.map(r => Math.round((r.score / r.total_marks) * 100));
-          const scoreLabels = recentResults.map((_, i) => `Q${i + 1}`);
-
-          return (
-            <>
-              {/* Stats */}
-              <div className="stats-grid">
-                <StatCard
-                  title="Overall Progress"
-                  value={`${progress}%`}
-                  trend={`${attemptedCourseIds.size} Courses Started`}
-                  icon={<TrendingUp size={24} />}
-                />
-                <StatCard
-                  title="Active Courses"
-                  value={myCourses.length}
-                  trend="Enrolled"
-                  icon={<Layers size={24} />}
-                />
-                <StatCard
-                  title="Pending Quizzes"
-                  value={pendingCount}
-                  trend="To be attempted"
-                  icon={<BookOpen size={24} />}
-                />
-                <StatCard
-                  title="Average Score"
-                  value={`${avgScore}%`}
-                  trend={`${passedQuizzes} Passed`}
-                  icon={<Award size={24} />}
-                />
-              </div>
-
-              {/* Charts */}
-              <div className="charts">
-                <div className="chart-card">
-                  <div className="flex justify-between items-center mb-6">
-                    <div>
-                      <h2 className="chart-title mb-0">Weekly Productivity</h2>
-                      <p className="text-xs text-slate-500">Quiz attempts by day of week</p>
-                    </div>
-                  </div>
-                  <BarChart data={productivityData} labels={days} color="#6366f1" />
-                </div>
-                <div className="chart-card">
-                  <div className="flex justify-between items-center mb-6">
-                    <div>
-                      <h2 className="chart-title mb-0">Quiz Scores</h2>
-                      <p className="text-xs text-slate-500">Performance (Percentage) of last 5 attempts</p>
-                    </div>
-                  </div>
-                  <MiniLineChart data={scoreData} labels={scoreLabels} />
-                </div>
-              </div>
-            </>
-          );
-        })()}
-
-        {activeTab === "browse" && (
-          <div className="flex flex-col gap-8">
-            <div className="flex justify-between items-center">
               <div>
-                <h2 className="text-2xl font-bold">Discover Courses</h2>
-                <p className="text-muted text-sm mt-1">Join new courses using the keys provided by your instructors</p>
-              </div>
-              <div className="px-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl text-sm font-bold text-slate-700 dark:text-gray-300 border border-slate-200 dark:border-slate-700">
-                <span className="text-indigo-400 font-bold">{courses.length}</span> Courses Found
+                <h1 className="text-xl md:text-3xl">Welcome back, {studentData?.full_name || "Student"}</h1>
+                <p className="header-subtitle mt-1">Ready for your next quiz?</p>
               </div>
             </div>
+            <div className="flex items-center gap-4">
+              {/* Notification Bell */}
+              <div className="relative">
+                <button
+                  className="p-3 btn-secondary rounded-xl relative"
+                  onClick={() => setShowNotifications(!showNotifications)}
+                >
+                  <Bell size={20} className={notifications.some(n => !n.is_read) ? "text-indigo-500" : "text-gray-500"} />
+                  {notifications.some(n => !n.is_read) && (
+                    <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-900 animate-pulse"></span>
+                  )}
+                </button>
 
-            {courses.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {courses.map(course => {
-                  const isEnrolled = myCourses.some(mc => mc.id === course.id);
-                  return (
-                    <div key={course.id} className="chart-card flex flex-col justify-between group hover:border-indigo-500/50 transition-all p-8 rounded-3xl">
-                      <div>
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="w-12 h-12 bg-indigo-500/10 text-indigo-400 rounded-2xl flex items-center justify-center font-black transition-transform group-hover:scale-110">
-                            {course.course_code.substring(0, 2).toUpperCase()}
-                          </div>
-                          <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-gray-400 px-2 py-1 rounded uppercase font-bold tracking-widest border border-slate-200 dark:border-slate-700">{course.course_code}</span>
-                        </div>
-                        <h3 className="text-xl font-bold mb-2 group-hover:text-indigo-400 transition-colors">{course.title}</h3>
-                        <p className="text-gray-400 text-sm mb-6 line-clamp-3 leading-relaxed">{course.description}</p>
-                      </div>
-                      {isEnrolled ? (
-                        <button className="w-full bg-slate-50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 py-3 rounded-2xl font-bold cursor-default flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-800">
-                          <CheckCircle size={16} /> Enrolled
-                        </button>
-                      ) : (
-                        <button
-                          className="w-full btn-primary py-3 rounded-2xl font-bold shadow-lg shadow-indigo-900/20 active:scale-[0.98]"
-                          onClick={() => {
-                            setSelectedCourseForEnroll(course);
-                            setShowEnrollModal(true);
-                          }}
+                {showNotifications && (
+                  <div className="absolute right-0 mt-3 w-80 dropdown-card rounded-2xl z-[300] overflow-hidden">
+                    <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                      <h3 className="font-bold text-slate-900 dark:text-white">Notifications</h3>
+                      <button className="text-xs text-indigo-500 hover:underline" onClick={() => setShowNotifications(false)}>Close</button>
+                    </div>
+                    <div className="max-h-96 overflow-y-auto">
+                      {notifications.length > 0 ? notifications.map(n => (
+                        <div
+                          key={n.id}
+                          className={`p-4 border-b border-slate-800/50 last:border-0 hover:bg-slate-800/30 transition cursor-pointer ${!n.is_read ? 'bg-indigo-500/5' : ''}`}
+                          onClick={() => handleMarkAsRead(n.id)}
                         >
-                          Enroll Now
-                        </button>
+                          <div className="flex justify-between items-start mb-1">
+                            <span className={`text-[10px] uppercase font-black tracking-widest px-2 py-0.5 rounded ${n.type === 'quiz' ? 'bg-red-500/20 text-red-400' : 'bg-indigo-500/20 text-indigo-400'}`}>
+                              {n.type}
+                            </span>
+                            <span className="text-[10px] text-slate-500">{new Date(n.created_at).toLocaleDateString()}</span>
+                          </div>
+                          <h4 className="text-sm font-bold text-white mb-1">{n.title}</h4>
+                          <p className="text-xs text-gray-400 leading-relaxed">{n.message}</p>
+                        </div>
+                      )) : (
+                        <div className="p-8 text-center text-slate-500 text-sm">No new notifications</div>
                       )}
                     </div>
-                  );
-                })}
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="py-32 text-center bg-slate-50 dark:bg-slate-800/20 rounded-[3rem] border-2 border-dashed border-slate-200 dark:border-slate-800/50">
-                <Search size={48} className="mx-auto mb-4 text-slate-300 dark:text-slate-700" />
-                <p className="text-xl font-bold text-slate-400">No courses available yet.</p>
-                <p className="text-sm text-slate-400 mt-2">Check back later or ask your instructor for a key.</p>
-                <button
-                  onClick={() => window.location.reload()}
-                  className="mt-8 text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-2 mx-auto px-6 py-2 rounded-full border border-indigo-500/20 hover:bg-indigo-500/5 transition"
-                >
-                  <TrendingUp size={16} /> Refresh Course List
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === "my-courses" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {myCourses.map(course => (
-              <div key={course.id} className="chart-card">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-xl font-bold">{course.title}</h3>
-                  <span className="text-xs bg-indigo-500/20 text-indigo-400 px-2 py-1 rounded-md font-mono">{course.course_code}</span>
-                </div>
-                <p className="text-gray-400 text-sm mb-4 line-clamp-2">{course.description}</p>
-                <div className="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                  <div className="bg-indigo-500 h-full w-3/4"></div>
-                </div>
-                <div className="flex justify-between items-center mt-3">
-                  <p className="text-xs text-indigo-400 font-medium">75% Complete</p>
-                  <button
-                    className="text-xs text-indigo-400 hover:underline"
-                    onClick={() => setActiveTab("quizzes")}
-                  >
-                    View Quizzes
-                  </button>
-                </div>
-              </div>
-            ))}
-            {myCourses.length === 0 && (
-              <div className="col-span-full py-20 text-center">
-                <Layers size={48} className="mx-auto text-slate-700 mb-4" />
-                <p className="text-slate-500">You are not enrolled in any courses yet.</p>
-                <button
-                  className="text-indigo-400 hover:underline mt-2"
-                  onClick={() => setActiveTab("browse")}
-                >
-                  Browse available courses
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === "quizzes" && (
-          <div className="flex flex-col gap-6">
-            <h2 className="text-2xl font-bold">Upcoming & Active Quizzes</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {myCourses.map(course => (
-                <QuizGroup key={course.id} course={course} results={results} onTakeQuiz={(quiz) => { setSelectedQuiz(quiz); setShowKeyModal(true); }} />
-              ))}
+              <button className="hidden sm:block btn-primary px-4 py-2 rounded-xl" onClick={() => setActiveTab("browse")}>Enroll New Course</button>
             </div>
-            {myCourses.length === 0 && <p className="text-gray-400">Enroll in a course to see available quizzes.</p>}
           </div>
         )}
 
-        {activeTab === "reports" && (
-          <div className="flex flex-col gap-6">
-            <div className="chart-card p-8">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="p-3 bg-indigo-600/10 text-indigo-500 rounded-xl">
-                  <TrendingUp size={24} />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold">Performance History</h3>
-                  <p className="text-sm text-slate-500">Track your progress across all quizzes</p>
-                </div>
-              </div>
+        {/* Content Area - Scrollable */}
+        <div className={`content-area ${activeTab === 'quiz-session' ? 'p-8' : ''}`}>
 
-              {results.length > 0 ? (
-                <div className="flex flex-col gap-4">
-                  {results.slice().reverse().map((res, idx) => (
-                    <div key={res.id || idx} className="bg-slate-800/30 border border-slate-800 p-5 rounded-2xl flex justify-between items-center group hover:border-indigo-500/30 transition-all">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center text-indigo-400 font-bold border border-slate-800">
-                          {Math.round((res.score / res.total_marks) * 100)}%
-                        </div>
-                        <div>
-                          <h4 className="font-semibold text-white">{res.quiz?.title || `Quiz Attempt #${results.length - idx}`}</h4>
-                          <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">{res.quiz?.course?.title}</p>
-                          <p className="text-xs text-gray-500 mt-1">{new Date(res.completed_at).toLocaleDateString()} • {res.score} / {res.total_marks} Marks</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${res.score / res.total_marks >= 0.4 ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
-                          {res.score / res.total_marks >= 0.4 ? 'Passed' : 'Failed'}
-                        </div>
-                        <TrendingUp size={16} className="text-slate-700 group-hover:text-indigo-500 transition-colors" />
+
+          {activeTab === "dashboard" && (() => {
+            // Calculate dynamic data
+            const totalAttempts = results.length;
+            const passedQuizzes = results.filter(r => (r.score / r.total_marks) >= 0.4).length;
+            const avgScore = totalAttempts > 0
+              ? Math.round((results.reduce((acc, r) => acc + (r.score / r.total_marks), 0) / totalAttempts) * 100)
+              : 0;
+
+            // Pending Quizzes: Check all quizzes in enrolled courses not in results
+            const attemptedQuizIds = new Set(results.map(r => r.quiz_id));
+            let pendingCount = 0;
+            myCourses.forEach(course => {
+              if (course.quizzes) {
+                course.quizzes.forEach(q => {
+                  if (!attemptedQuizIds.has(q.id)) pendingCount++;
+                });
+              }
+            });
+
+            // Overall Progress: Passed courses (at least one quiz passed) / Total enrolled
+            // For simplicity, let's use: (courses with at least one attempt) / Total enrolled
+            const attemptedCourseIds = new Set(results.map(r => r.quiz?.course_id));
+            const progress = myCourses.length > 0
+              ? Math.round((attemptedCourseIds.size / myCourses.length) * 100)
+              : 0;
+
+            // Weekly Productivity (Last 7 Days Attempts)
+            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const productivityData = [0, 0, 0, 0, 0, 0, 0];
+            results.forEach(r => {
+              const date = new Date(r.completed_at);
+              const today = new Date();
+              const diffTime = Math.abs(today - date);
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              if (diffDays <= 7) {
+                productivityData[date.getDay()]++;
+              }
+            });
+
+            // Quiz Scores (Last 5 attempts)
+            const recentResults = results.slice(-5);
+            const scoreData = recentResults.map(r => Math.round((r.score / r.total_marks) * 100));
+            const scoreLabels = recentResults.map((_, i) => `Q${i + 1}`);
+
+            return (
+              <>
+                {/* Stats */}
+                <div className="stats-grid">
+                  <StatCard
+                    title="Overall Progress"
+                    value={`${progress}%`}
+                    trend={`${attemptedCourseIds.size} Courses Started`}
+                    icon={<TrendingUp size={24} />}
+                  />
+                  <StatCard
+                    title="Active Courses"
+                    value={myCourses.length}
+                    trend="Enrolled"
+                    icon={<Layers size={24} />}
+                  />
+                  <StatCard
+                    title="Pending Quizzes"
+                    value={pendingCount}
+                    trend="To be attempted"
+                    icon={<BookOpen size={24} />}
+                  />
+                  <StatCard
+                    title="Average Score"
+                    value={`${avgScore}%`}
+                    trend={`${passedQuizzes} Passed`}
+                    icon={<Award size={24} />}
+                  />
+                </div>
+
+                {/* Charts */}
+                <div className="charts">
+                  <div className="chart-card">
+                    <div className="flex justify-between items-center mb-6">
+                      <div>
+                        <h2 className="chart-title mb-0">Weekly Productivity</h2>
+                        <p className="text-xs text-slate-500">Quiz attempts by day of week</p>
                       </div>
                     </div>
-                  ))}
+                    <BarChart data={productivityData} labels={days} color="#6366f1" />
+                  </div>
+                  <div className="chart-card">
+                    <div className="flex justify-between items-center mb-6">
+                      <div>
+                        <h2 className="chart-title mb-0">Quiz Scores</h2>
+                        <p className="text-xs text-slate-500">Performance (Percentage) of last 5 attempts</p>
+                      </div>
+                    </div>
+                    <MiniLineChart data={scoreData} labels={scoreLabels} />
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+
+          {activeTab === "browse" && (
+            <div className="flex flex-col gap-8">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold">Discover Courses</h2>
+                  <p className="text-muted text-sm mt-1">Join new courses using the keys provided by your instructors</p>
+                </div>
+                <div className="px-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl text-sm font-bold text-slate-700 dark:text-gray-300 border border-slate-200 dark:border-slate-700">
+                  <span className="text-indigo-400 font-bold">{courses.length}</span> Courses Found
+                </div>
+              </div>
+
+              {fetchError ? (
+                <div className="py-20 text-center bg-red-500/5 rounded-[3rem] border-2 border-dashed border-red-500/20">
+                  <ShieldAlert size={48} className="mx-auto mb-4 text-red-400" />
+                  <p className="text-xl font-bold text-red-500">Data Access Error</p>
+                  <p className="text-sm text-red-400 mt-2">{fetchError}</p>
+                  <button onClick={() => window.location.reload()} className="mt-8 btn-primary px-8 py-3 rounded-2xl">Retry Connection</button>
+                </div>
+              ) : courses.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {courses.map(course => {
+                    const isEnrolled = myCourses.some(mc => mc.id === course.id);
+                    return (
+                      <div key={course.id} className="chart-card flex flex-col justify-between group hover:border-indigo-500/50 transition-all p-8 rounded-3xl">
+                        <div>
+                          <div className="flex justify-between items-start mb-4">
+                            <div className="w-12 h-12 bg-indigo-500/10 text-indigo-400 rounded-2xl flex items-center justify-center font-black transition-transform group-hover:scale-110">
+                              {course.course_code.substring(0, 2).toUpperCase()}
+                            </div>
+                            <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-gray-400 px-2 py-1 rounded uppercase font-bold tracking-widest border border-slate-200 dark:border-slate-700">{course.course_code}</span>
+                          </div>
+                          <h3 className="text-xl font-bold mb-2 group-hover:text-indigo-400 transition-colors">{course.title}</h3>
+                          <p className="text-gray-400 text-sm mb-6 line-clamp-3 leading-relaxed">{course.description}</p>
+                        </div>
+                        {isEnrolled ? (
+                          <button className="w-full bg-slate-50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 py-3 rounded-2xl font-bold cursor-default flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-800">
+                            <CheckCircle size={16} /> Enrolled
+                          </button>
+                        ) : (
+                          <button
+                            className="w-full btn-primary py-3 rounded-2xl font-bold shadow-lg shadow-indigo-900/20 active:scale-[0.98]"
+                            onClick={() => {
+                              setSelectedCourseForEnroll(course);
+                              setShowEnrollModal(true);
+                            }}
+                          >
+                            Enroll Now
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
-                <div className="py-20 text-center text-slate-400 bg-slate-50 dark:bg-slate-800/20 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800">
-                  <Database size={48} className="mx-auto mb-4 opacity-20" />
-                  <p className="font-medium">No quiz results yet.</p>
-                  <p className="text-xs opacity-60">Complete a quiz to see your performance here.</p>
+                <div className="py-32 text-center bg-slate-50 dark:bg-slate-800/20 rounded-[3rem] border-2 border-dashed border-slate-200 dark:border-slate-800/50">
+                  <Search size={48} className="mx-auto mb-4 text-slate-300 dark:text-slate-700" />
+                  <p className="text-xl font-bold text-slate-400">No courses available yet.</p>
+                  <p className="text-sm text-slate-400 mt-2">Check back later or ask your instructor for a key.</p>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="mt-8 text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-2 mx-auto px-6 py-2 rounded-full border border-indigo-500/20 hover:bg-indigo-500/5 transition"
+                  >
+                    <TrendingUp size={16} /> Refresh Course List
+                  </button>
                 </div>
               )}
             </div>
-          </div>
-        )}
+          )}
 
-        {activeTab === "quiz-session" && activeQuizQuestions && (
-          <QuizSession
-            quiz={selectedQuiz}
-            questions={activeQuizQuestions}
-            onFinish={(result) => {
-              setResultData(result);
-              setActiveTab("quiz-result");
-            }}
-          />
-        )}
-
-        {activeTab === "quiz-result" && resultData && (
-          <div className="chart-card p-12 text-center flex flex-col items-center">
-            <div className="w-24 h-24 bg-indigo-600/10 text-indigo-500 rounded-full flex items-center justify-center mb-6">
-              <Award size={48} />
+          {activeTab === "my-courses" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {myCourses.map(course => (
+                <div key={course.id} className="chart-card">
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="text-xl font-bold">{course.title}</h3>
+                    <span className="text-xs bg-indigo-500/20 text-indigo-400 px-2 py-1 rounded-md font-mono">{course.course_code}</span>
+                  </div>
+                  <p className="text-gray-400 text-sm mb-4 line-clamp-2">{course.description}</p>
+                  <div className="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                    <div className="bg-indigo-500 h-full w-3/4"></div>
+                  </div>
+                  <div className="flex justify-between items-center mt-3">
+                    <p className="text-xs text-indigo-400 font-medium">75% Complete</p>
+                    <button
+                      className="text-xs text-indigo-400 hover:underline"
+                      onClick={() => setActiveTab("quizzes")}
+                    >
+                      View Quizzes
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {myCourses.length === 0 && (
+                <div className="col-span-full py-20 text-center">
+                  <Layers size={48} className="mx-auto text-slate-700 mb-4" />
+                  <p className="text-slate-500">You are not enrolled in any courses yet.</p>
+                  <button
+                    className="text-indigo-400 hover:underline mt-2"
+                    onClick={() => setActiveTab("browse")}
+                  >
+                    Browse available courses
+                  </button>
+                </div>
+              )}
             </div>
-            <h2 className="text-3xl font-bold mb-1">Quiz Completed!</h2>
-            <p className="text-gray-400 mb-8">Great job finishing the {selectedQuiz.title}</p>
+          )}
 
-            <div className="flex gap-8 mb-10">
-              <div className="text-center">
-                <p className="text-3xl font-bold text-indigo-400">{resultData.score}/{resultData.total_marks}</p>
-                <p className="text-xs text-gray-500 uppercase tracking-widest mt-1">Final Score</p>
+          {activeTab === "quizzes" && (
+            <div className="flex flex-col gap-6">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <h2 className="text-2xl font-bold">Upcoming & Active Quizzes</h2>
+
+                {/* Filters */}
+                <div className="flex flex-wrap gap-4">
+                  <select
+                    className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-400 focus:ring-2 focus:ring-indigo-500 outline-none"
+                    value={selectedCourseFilter}
+                    onChange={(e) => setSelectedCourseFilter(e.target.value)}
+                  >
+                    <option value="all">All Courses</option>
+                    {myCourses.map(c => (
+                      <option key={c.id} value={c.id}>{c.title}</option>
+                    ))}
+                  </select>
+
+                  <select
+                    className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-400 focus:ring-2 focus:ring-indigo-500 outline-none"
+                    value={selectedQuizStatusFilter}
+                    onChange={(e) => setSelectedQuizStatusFilter(e.target.value)}
+                  >
+                    <option value="all">All Status</option>
+                    <option value="active">Active Now</option>
+                  </select>
+                </div>
               </div>
-              <div className="text-center border-l border-slate-800 pl-8">
-                <p className="text-3xl font-bold text-white">
-                  {Math.round((resultData.score / resultData.total_marks) * 100)}%
-                </p>
-                <p className="text-xs text-gray-500 uppercase tracking-widest mt-1">Accuracy</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {myCourses
+                  .filter(c => selectedCourseFilter === "all" || String(c.id) === String(selectedCourseFilter))
+                  .map(course => (
+                    <QuizGroup
+                      key={course.id}
+                      course={course}
+                      results={results}
+                      onTakeQuiz={(quiz) => { setSelectedQuiz(quiz); setShowKeyModal(true); }}
+                      statusFilter={selectedQuizStatusFilter}
+                    />
+                  ))
+                }
+              </div>
+              {myCourses.length === 0 && <p className="text-gray-400">Enroll in a course to see available quizzes.</p>}
+            </div>
+          )}
+
+          {activeTab === "reports" && (
+            <div className="flex flex-col gap-6">
+              <div className="chart-card p-8">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="p-3 bg-indigo-600/10 text-indigo-500 rounded-xl">
+                    <TrendingUp size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold">Performance History</h3>
+                    <p className="text-sm text-slate-500">Track your progress across all quizzes</p>
+                  </div>
+                </div>
+
+                {results.length > 0 ? (
+                  <div className="flex flex-col gap-4">
+                    {results.slice().reverse().map((res, idx) => (
+                      <div key={res.id || idx} className="bg-slate-800/30 border border-slate-800 p-5 rounded-2xl flex justify-between items-center group hover:border-indigo-500/30 transition-all">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center text-indigo-400 font-bold border border-slate-800">
+                            {Math.round((res.score / res.total_marks) * 100)}%
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-white">{res.quiz?.title || `Quiz Attempt #${results.length - idx}`}</h4>
+                            <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">{res.quiz?.course?.title}</p>
+                            <p className="text-xs text-gray-500 mt-1">{new Date(res.completed_at).toLocaleDateString()} • {res.score} / {res.total_marks} Marks</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${res.score / res.total_marks >= 0.4 ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                            {res.score / res.total_marks >= 0.4 ? 'Passed' : 'Failed'}
+                          </div>
+                          <TrendingUp size={16} className="text-slate-700 group-hover:text-indigo-500 transition-colors" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-20 text-center text-slate-400 bg-slate-50 dark:bg-slate-800/20 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800">
+                    <Database size={48} className="mx-auto mb-4 opacity-20" />
+                    <p className="font-medium">No quiz results yet.</p>
+                    <p className="text-xs opacity-60">Complete a quiz to see your performance here.</p>
+                  </div>
+                )}
               </div>
             </div>
+          )}
 
-            <button
-              className="btn-primary px-8 py-3 rounded-xl font-bold transition"
-              onClick={() => setActiveTab("dashboard")}
-            >
-              Go to Dashboard
-            </button>
-          </div>
-        )}
+          {activeTab === "quiz-session" && activeQuizQuestions && (
+            <QuizSession
+              quiz={selectedQuiz}
+              questions={activeQuizQuestions}
+              onFinish={(result) => {
+                setResultData(result);
+                setActiveTab("quiz-result");
+              }}
+            />
+          )}
+
+          {activeTab === "quiz-result" && resultData && (
+            <div className="chart-card p-12 text-center flex flex-col items-center">
+              <div className="w-24 h-24 bg-indigo-600/10 text-indigo-500 rounded-full flex items-center justify-center mb-6">
+                <Award size={48} />
+              </div>
+              <h2 className="text-3xl font-bold mb-1">Quiz Completed!</h2>
+              <p className="text-gray-400 mb-8">Great job finishing the {selectedQuiz.title}</p>
+
+              <div className="flex gap-8 mb-10">
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-indigo-400">{resultData.score}/{resultData.total_marks}</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-widest mt-1">Final Score</p>
+                </div>
+                <div className="text-center border-l border-slate-800 pl-8">
+                  <p className="text-3xl font-bold text-white">
+                    {Math.round((resultData.score / resultData.total_marks) * 100)}%
+                  </p>
+                  <p className="text-xs text-gray-500 uppercase tracking-widest mt-1">Accuracy</p>
+                </div>
+              </div>
+
+              <button
+                className="btn-primary px-8 py-3 rounded-xl font-bold transition"
+                onClick={() => setActiveTab("dashboard")}
+              >
+                Go to Dashboard
+              </button>
+            </div>
+          )}
+          {
+            activeTab === "profile" && (
+              <div className="max-w-2xl mx-auto w-full">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-3xl font-bold">Edit Profile</h2>
+                  <button onClick={() => setActiveTab("dashboard")} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition">
+                    <X size={24} className="text-slate-500" />
+                  </button>
+                </div>
+                <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl">
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.target);
+                    const updates = Object.fromEntries(formData.entries());
+
+                    const cleanUpdates = {};
+                    for (const [key, value] of Object.entries(updates)) {
+                      if (value.trim() !== "") cleanUpdates[key] = value;
+                    }
+
+                    try {
+                      const token = localStorage.getItem("token");
+                      const res = await fetch("http://127.0.0.1:8000/auth/me", {
+                        method: "PUT",
+                        headers: {
+                          "Content-Type": "application/json",
+                          "Authorization": `Bearer ${token}`
+                        },
+                        body: JSON.stringify(cleanUpdates)
+                      });
+                      if (res.ok) {
+                        alert("Profile updated successfully!");
+                      } else {
+                        const err = await res.json();
+                        alert("Update failed: " + (err.detail || "Unknown error"));
+                      }
+                    } catch (err) {
+                      alert("Network error");
+                    }
+                  }} className="flex flex-col gap-6">
+
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="w-20 h-20 bg-indigo-600 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-lg shadow-indigo-600/20">
+                        {studentData.full_name?.charAt(0)}
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold">{studentData?.full_name}</h3>
+                        <p className="text-slate-500 text-sm">{studentData?.email}</p>
+                        <span className="inline-block mt-1 px-2 py-0.5 bg-indigo-500/10 text-indigo-500 text-[10px] font-bold uppercase tracking-wider rounded">Student Account</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Full Name</label>
+                        <input name="full_name" defaultValue={studentData?.full_name} className="input-field w-full p-3 rounded-xl" placeholder="Your Name" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Email</label>
+                        <input name="email" defaultValue={studentData?.email} className="input-field w-full p-3 rounded-xl" placeholder="Email Address" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Student ID</label>
+                        <input name="student_id" defaultValue={studentData?.student_id} className="input-field w-full p-3 rounded-xl" placeholder="STU-XXX" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Department</label>
+                        <input name="department" defaultValue={studentData?.department} className="input-field w-full p-3 rounded-xl" placeholder="Department" />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">University</label>
+                        <input name="university" defaultValue={studentData?.university} className="input-field w-full p-3 rounded-xl" placeholder="University Name" />
+                      </div>
+                    </div>
+
+                    <div className="border-t border-slate-200 dark:border-slate-700 pt-6 mt-2">
+                      <h4 className="font-bold text-slate-900 dark:text-white mb-4">Security</h4>
+                      <div>
+                        <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">New Password (Optional)</label>
+                        <input name="password" type="password" className="input-field w-full p-3 rounded-xl" placeholder="Leave empty to keep current" />
+                      </div>
+                    </div>
+
+                    <button type="submit" className="btn-primary py-4 rounded-xl font-bold shadow-lg shadow-indigo-600/20 mt-2">
+                      Save Changes
+                    </button>
+                  </form>
+                </div>
+              </div>
+            )
+          }
+          {
+            activeTab === "attempt-history" && (
+              <AttemptHistory studentData={studentData} results={results} />
+            )
+          }
+        </div>
       </main>
 
       {/* Enrollment Key Modal */}
-      {showEnrollModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[200] p-4">
-          <div className="bg-slate-900 border border-slate-800 p-8 rounded-[2rem] w-full max-w-md shadow-2xl">
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <h2 className="text-2xl font-bold flex items-center gap-2 text-white">
-                  <BookOpen className="text-indigo-500" />
-                  Join {selectedCourseForEnroll?.title}
-                </h2>
-                <p className="text-muted text-sm mt-1">Requires a secure enrollment key</p>
+      {
+        showEnrollModal && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[200] p-4">
+            <div className="bg-slate-900 border border-slate-800 p-8 rounded-[2rem] w-full max-w-md shadow-2xl">
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold flex items-center gap-2 text-white">
+                    <BookOpen className="text-indigo-500" />
+                    Join {selectedCourseForEnroll?.title}
+                  </h2>
+                  <p className="text-muted text-sm mt-1">Requires a secure enrollment key</p>
+                </div>
+                <button onClick={() => setShowEnrollModal(false)} className="text-gray-500 hover:text-white">
+                  <X size={20} />
+                </button>
               </div>
-              <button onClick={() => setShowEnrollModal(false)} className="text-gray-500 hover:text-white">
-                <X size={20} />
-              </button>
+
+              <form onSubmit={handleEnroll} className="flex flex-col gap-4">
+                <div className="relative">
+                  <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                  <input
+                    type="text"
+                    placeholder="ENTER-COURSE-KEY"
+                    className="w-full input-field p-4 pl-12 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white font-mono font-black"
+                    value={enrollKey}
+                    onChange={(e) => setEnrollKey(e.target.value.toUpperCase())}
+                    autoFocus
+                    required
+                  />
+                </div>
+
+                <div className="bg-indigo-500/5 border border-indigo-500/10 p-4 rounded-2xl flex items-start gap-3">
+                  <Shield className="text-indigo-400 shrink-0" size={18} />
+                  <p className="text-xs text-indigo-300 leading-relaxed italic">
+                    Ask your teacher for the enrollment key to access course materials and quizzes.
+                  </p>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full btn-primary p-4 rounded-2xl font-black text-white transition flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
+                >
+                  Enroll in Course
+                </button>
+              </form>
             </div>
-
-            <form onSubmit={handleEnroll} className="flex flex-col gap-4">
-              <div className="relative">
-                <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                <input
-                  type="text"
-                  placeholder="ENTER-COURSE-KEY"
-                  className="w-full input-field p-4 pl-12 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white font-mono font-black"
-                  value={enrollKey}
-                  onChange={(e) => setEnrollKey(e.target.value.toUpperCase())}
-                  autoFocus
-                  required
-                />
-              </div>
-
-              <div className="bg-indigo-500/5 border border-indigo-500/10 p-4 rounded-2xl flex items-start gap-3">
-                <Shield className="text-indigo-400 shrink-0" size={18} />
-                <p className="text-xs text-indigo-300 leading-relaxed italic">
-                  Ask your teacher for the enrollment key to access course materials and quizzes.
-                </p>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full btn-primary p-4 rounded-2xl font-black text-white transition flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
-              >
-                Enroll in Course
-              </button>
-            </form>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Key Validation Modal */}
-      {showKeyModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[200] p-4">
-          <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl w-full max-w-md shadow-2xl">
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <h2 className="text-2xl font-bold flex items-center gap-2 text-white">
-                  <Shield className="text-indigo-500" />
-                  Secure Access
-                </h2>
-                <p className="text-gray-400 text-sm mt-1">Enter the access key for {selectedQuiz?.title}</p>
+      {
+        showKeyModal && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[200] p-4">
+            <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl w-full max-w-md shadow-2xl">
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold flex items-center gap-2 text-white">
+                    <Shield className="text-indigo-500" />
+                    Secure Access
+                  </h2>
+                  <p className="text-gray-400 text-sm mt-1">Enter the access key for {selectedQuiz?.title}</p>
+                </div>
+                <button onClick={() => setShowKeyModal(false)} className="text-gray-500 hover:text-white">
+                  <X size={20} />
+                </button>
               </div>
-              <button onClick={() => setShowKeyModal(false)} className="text-gray-500 hover:text-white">
-                <X size={20} />
-              </button>
+
+              <form onSubmit={handleValidateKey} className="flex flex-col gap-4">
+                <div className="relative">
+                  <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                  <input
+                    type="text"
+                    placeholder="EXAM-KEY-123"
+                    className="w-full input-field p-4 pl-12 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white font-mono font-black"
+                    value={quizKey}
+                    onChange={(e) => setQuizKey(e.target.value.toUpperCase())}
+                    required
+                  />
+                </div>
+
+                <div className="bg-indigo-500/10 border border-indigo-500/20 p-4 rounded-xl flex items-start gap-3">
+                  <Clock className="text-indigo-400 shrink-0" size={18} />
+                  <p className="text-xs text-indigo-300 leading-relaxed">
+                    This quiz is timed ({selectedQuiz?.duration}m). Ensure you have a stable connection. Cheating detection is active.
+                  </p>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full btn-primary p-3 rounded-xl font-semibold text-white transition flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
+                >
+                  Start Quiz Now
+                </button>
+              </form>
             </div>
-
-            <form onSubmit={handleValidateKey} className="flex flex-col gap-4">
-              <div className="relative">
-                <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                <input
-                  type="text"
-                  placeholder="EXAM-KEY-123"
-                  className="w-full input-field p-4 pl-12 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white font-mono font-black"
-                  value={quizKey}
-                  onChange={(e) => setQuizKey(e.target.value.toUpperCase())}
-                  required
-                />
-              </div>
-
-              <div className="bg-indigo-500/10 border border-indigo-500/20 p-4 rounded-xl flex items-start gap-3">
-                <Clock className="text-indigo-400 shrink-0" size={18} />
-                <p className="text-xs text-indigo-300 leading-relaxed">
-                  This quiz is timed ({selectedQuiz?.duration}m). Ensure you have a stable connection. Cheating detection is active.
-                </p>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full btn-primary p-3 rounded-xl font-semibold text-white transition flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
-              >
-                Start Quiz Now
-              </button>
-            </form>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   );
 }
 
-function QuizGroup({ course, results, onTakeQuiz }) {
+function QuizGroup({ course, results, onTakeQuiz, statusFilter }) {
   const [quizzes, setQuizzes] = useState([]);
 
   useEffect(() => {
-    fetch(`http://127.0.0.1:8000/courses/${course.id}/quizzes`)
+    fetch(`http://127.0.0.1:8000/courses/${course.id}/quizzes`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    })
       .then(res => res.json())
-      .then(data => setQuizzes(data));
-  }, [course.id]);
+      .then(data => {
+        let filtered = data;
+        if (statusFilter === 'active') {
+          // Assuming active means status is 'live' or open based on dates.
+          // For now, let's filter by simple status string if available or assume 'live'
+          filtered = data.filter(q => q.status === 'live');
+        }
+        setQuizzes(filtered);
+      })
+      .catch(err => console.error("Failed to load quizzes", err));
+  }, [course.id, statusFilter]);
 
   if (quizzes.length === 0) return null;
 
@@ -792,6 +1017,224 @@ function SidebarItem({ icon, label, active, onClick }) {
   );
 }
 
+function AttemptHistory({ results }) {
+  const [selectedCourse, setSelectedCourse] = useState("");
+  const [selectedQuiz, setSelectedQuiz] = useState(null);
+  const [selectedCourseFilter, setSelectedCourseFilter] = useState("all");
+  const [selectedQuizStatusFilter, setSelectedQuizStatusFilter] = useState("all");
+  const [courses, setCourses] = useState([]);
+  const [quizDetails, setQuizDetails] = useState(null);
+  const [activeTab, setActiveTab] = useState("mcq");
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    fetch("http://127.0.0.1:8000/enrollments/my", {
+      headers: { "Authorization": `Bearer ${token}` }
+    })
+      .then(res => res.json())
+      .then(data => setCourses(data));
+  }, []);
+
+  const filteredQuizzes = results
+    .filter(r => !selectedCourse || r.quiz?.course_id === parseInt(selectedCourse))
+    .map(r => r.quiz)
+    .filter((q, index, self) => q && self.findIndex(x => x.id === q.id) === index);
+
+  const selectedResult = results.find(r => r.quiz_id === parseInt(selectedQuiz));
+
+  useEffect(() => {
+    if (selectedQuiz) {
+      fetch(`http://127.0.0.1:8000/quizzes/${selectedQuiz}/questions`)
+        .then(res => res.json())
+        .then(data => setQuizDetails(data));
+    } else {
+      setQuizDetails(null);
+    }
+  }, [selectedQuiz]);
+
+  return (
+    <div className="flex flex-col gap-8 max-w-5xl mx-auto w-full">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Attempt History</h2>
+          <p className="text-slate-500 mt-1">Review your previously submitted answers</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="flex flex-col gap-2">
+          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Filter by Course</label>
+          <select
+            className="input-field p-4 rounded-2xl bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 font-bold"
+            value={selectedCourse}
+            onChange={(e) => { setSelectedCourse(e.target.value); setSelectedQuiz(""); }}
+          >
+            <option value="">All Courses</option>
+            {courses.map(c => <option key={c.id} value={c.id}>{c.title} ({c.course_code})</option>)}
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Select Quiz Attempt</label>
+          <select
+            className="input-field p-4 rounded-2xl bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 font-bold"
+            value={selectedQuiz}
+            onChange={(e) => setSelectedQuiz(e.target.value)}
+            disabled={!selectedCourse && filteredQuizzes.length === 0}
+          >
+            <option value="">Select a Quiz</option>
+            {filteredQuizzes.map(q => <option key={q.id} value={q.id}>{q.title}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {selectedResult && quizDetails ? (
+        <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="bg-indigo-600 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-indigo-600/20 flex flex-col md:flex-row justify-between items-center gap-6">
+            <div>
+              <span className="text-white/60 text-[10px] font-black uppercase tracking-widest">Performance Summary</span>
+              <h3 className="text-2xl font-black mt-1">{selectedResult.quiz?.title}</h3>
+              <p className="text-white/80 text-sm mt-2 flex items-center gap-2">
+                <CheckCircle size={16} /> Completed on {new Date(selectedResult.completed_at).toLocaleDateString()}
+              </p>
+            </div>
+            <div className="flex gap-4">
+              <div className="bg-white/10 backdrop-blur-md rounded-3xl p-6 text-center border border-white/10">
+                <p className="text-4xl font-black">{selectedResult.score}</p>
+                <p className="text-[10px] font-black uppercase opacity-60 tracking-widest mt-1">Your Score</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-md rounded-3xl p-6 text-center border border-white/10">
+                <p className="text-4xl font-black text-white/40">{selectedResult.total_marks}</p>
+                <p className="text-[10px] font-black uppercase opacity-60 tracking-widest mt-1">Total Marks</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-2 p-1.5 bg-slate-100 dark:bg-slate-800/50 rounded-2xl w-fit self-center border border-slate-200 dark:border-slate-700">
+            {["mcq", "true_false", "description"].map((type) => (
+              <button
+                key={type}
+                onClick={() => setActiveTab(type)}
+                className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === type
+                  ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                  }`}
+              >
+                {type === "true_false" ? "T/F" : type}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-4">
+            {quizDetails
+              .filter(q => q.question_type === activeTab)
+              .map((q, idx) => {
+                const studentAns = selectedResult.answers?.[String(q.id)];
+                const normalize = (val) => (val || "").toString().toLowerCase().trim();
+                const isCorrect = normalize(studentAns) === normalize(q.correct_option);
+                const feedback = selectedResult.feedback?.[q.id];
+
+                return (
+                  <div key={q.id} className="bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex justify-between items-start mb-6">
+                      <span className="bg-slate-100 dark:bg-slate-900 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">Question {idx + 1}</span>
+                      {activeTab !== "description" && (
+                        <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${!studentAns
+                          ? "bg-slate-100 dark:bg-slate-700 text-slate-500"
+                          : isCorrect
+                            ? "bg-green-500/10 text-green-500"
+                            : "bg-red-500/10 text-red-500"
+                          }`}>
+                          {!studentAns ? "Not Answered" : isCorrect ? `+${q.point_value || 1} Points` : "Wrong"}
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="text-lg font-bold text-slate-900 dark:text-white mb-6 leading-relaxed">{q.text}</h4>
+
+                    {activeTab === "description" ? (
+                      <div className="flex flex-col gap-4">
+                        <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-700">
+                          <p className="text-[10px] font-black uppercase text-slate-400 mb-2">Your Answer</p>
+                          <p className={`font-medium whitespace-pre-wrap leading-relaxed ${studentAns ? "text-slate-700 dark:text-slate-300" : "text-slate-400 italic"}`}>
+                            {studentAns || "Not Answered"}
+                          </p>
+                        </div>
+                        {feedback && (
+                          <div className="bg-indigo-50 dark:bg-indigo-500/5 p-6 rounded-2xl border border-indigo-200 dark:border-indigo-500/20">
+                            <div className="flex justify-between items-center mb-2">
+                              <p className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">Teacher Feedback</p>
+                              <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">Awarded: {feedback.score} Marks</span>
+                            </div>
+                            <p className="text-slate-700 dark:text-slate-300 italic font-medium">"{feedback.comment}"</p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {["a", "b", "c", "d"].map((opt) => {
+                          if (activeTab === "true_false" && (opt === "c" || opt === "d")) return null;
+                          const optText = q[`option_${opt}`];
+                          const isStudentSelected = normalize(studentAns) === normalize(opt);
+                          const isCorrectOpt = normalize(q.correct_option) === normalize(opt);
+                          const isNotAnswered = !studentAns;
+
+                          // Styling Logic:
+                          // If Not Answered -> Neutral
+                          // If Answered:
+                          //   - Correct Option -> Green
+                          //   - Selected (if Wrong) -> Red
+                          //   - Others -> Neutral
+
+                          let cardClass = "bg-transparent border-slate-100 dark:border-slate-700 text-slate-500 opacity-60";
+                          let iconClass = "bg-slate-100 dark:bg-slate-700";
+
+                          if (!isNotAnswered) {
+                            if (isCorrectOpt) {
+                              cardClass = "bg-green-500/10 border-green-500 text-green-700 dark:text-green-400";
+                              iconClass = "bg-green-500 text-white";
+                            } else if (isStudentSelected) {
+                              cardClass = "bg-red-500/10 border-red-500 text-red-700 dark:text-red-400";
+                              iconClass = "bg-red-500 text-white";
+                            }
+                          }
+
+                          return (
+                            <div
+                              key={opt}
+                              className={`p-4 rounded-2xl border-2 flex items-center gap-4 transition-all ${cardClass}`}
+                            >
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black uppercase ${iconClass}`}>
+                                {opt}
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="font-bold">{optText}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      ) : selectedQuiz ? (
+        <div className="flex flex-col items-center justify-center h-64 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-700">
+          <p className="text-slate-400 font-bold uppercase tracking-widest text-sm">Loading attempt details...</p>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center p-20 bg-slate-100/50 dark:bg-slate-800/50 rounded-[3rem] border-2 border-dashed border-slate-200 dark:border-slate-700">
+          <div className="w-16 h-16 bg-slate-200 dark:bg-slate-700 rounded-full flex items-center justify-center mb-6 text-slate-400">
+            <Search size={32} />
+          </div>
+          <p className="text-slate-500 font-black uppercase tracking-widest text-center">Select a course and quiz to view your history</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function QuizSession({ quiz, questions, onFinish }) {
   const storageKey = `quiz_progress_${quiz.id}`;
 
@@ -831,7 +1274,15 @@ function QuizSession({ quiz, questions, onFinish }) {
   const trackingIntervalRef = useRef(null);
 
   // Sync Refs with State to avoid stale closures
-  useEffect(() => { answersRef.current = answers; }, [answers]);
+  useEffect(() => {
+    answersRef.current = answers;
+    localStorage.setItem(storageKey, JSON.stringify({
+      currentIndex,
+      answers,
+      violations,
+      timeLeft: timeLeftRef.current
+    }));
+  }, [answers, violations, currentIndex]);
   useEffect(() => { alertsRef.current = violations; }, [violations]);
   useEffect(() => { timelineRef.current = violationTimeline; }, [violationTimeline]);
   useEffect(() => { timeLeftRef.current = timeLeft; }, [timeLeft]);
@@ -962,28 +1413,53 @@ function QuizSession({ quiz, questions, onFinish }) {
         return;
       }
 
-      // Analyze gaze/orientation (basic landmark analysis)
       const landmarks = detections.landmarks;
+      const nose = landmarks.getNose();
       const leftEye = landmarks.getLeftEye();
       const rightEye = landmarks.getRightEye();
-      const nose = landmarks.getNose();
+      const jaw = landmarks.getJawOutline();
 
-      // Calculation for looking away (this is heuristic)
-      const eyeDistance = Math.abs(rightEye[1].x - leftEye[1].x);
-      const noseBridge = nose[0];
-      const eyeCenter = (leftEye[0].x + rightEye[0].x) / 2;
-      const noseOffset = Math.abs(noseBridge.x - eyeCenter);
+      // --- Precise Yaw Calculation ---
+      // Midpoint between eyes
+      const eyeMidX = (leftEye[0].x + rightEye[5].x) / 2;
+      const noseTipX = nose[6].x;
+      const faceWidth = Math.abs(jaw[16].x - jaw[0].x);
 
-      // Simple vertical check
-      const eyeLevel = (leftEye[0].y + rightEye[0].y) / 2;
-      const noseVerticalPos = (nose[3].y - eyeLevel) / eyeDistance;
+      // Yaw calculation (estimation in degrees)
+      const yaw = ((noseTipX - eyeMidX) / faceWidth) * 150; // 150 is a scaling factor
 
-      if (noseOffset > eyeDistance * 0.45) {
-        setFaceDetectionStatus("Side Look Detected");
-        startAlert("Looking Side");
-      } else if (noseVerticalPos < 0.15 || noseVerticalPos > 0.6) {
-        setFaceDetectionStatus("Up/Down Look Detected");
-        startAlert("Looking Up/Down");
+      // --- Precise Pitch Calculation ---
+      const eyeMidY = (leftEye[0].y + rightEye[5].y) / 2;
+      const noseTipY = nose[6].y;
+      const faceHeight = Math.abs(jaw[8].y - eyeMidY);
+
+      // Pitch calculation (estimation in degrees)
+      // Normal state nose is below eye center. 
+      // If looking up, nose gets closer to eye center (relative to face height)
+      const pitch = ((noseTipY - eyeMidY) / faceHeight - 0.5) * 100;
+
+      // Threshold Logic from USER Request:
+      // Center: ~0 Yaw, ~0 Pitch
+      // Left: +10 to +25 Yaw
+      // Right: -10 to -25 Yaw
+      // Top: -10 Pitch
+      // Bottom: +10 Pitch
+      // Not looking: > ±30 Yaw, > ±20 Pitch
+
+      let isViolation = false;
+      let reason = "";
+
+      if (Math.abs(yaw) > 30) {
+        isViolation = true;
+        reason = "Looking Away (Yaw)";
+      } else if (Math.abs(pitch) > 20) {
+        isViolation = true;
+        reason = "Looking Away (Pitch)";
+      }
+
+      if (isViolation) {
+        setFaceDetectionStatus(reason);
+        startAlert(reason);
       } else {
         setFaceDetectionStatus("Monitoring Active");
         stopAlert();
@@ -1034,7 +1510,8 @@ function QuizSession({ quiz, questions, onFinish }) {
     const newViolationCount = alertsRef.current + 1;
     setViolations(newViolationCount);
 
-    if (newViolationCount >= 10) {
+    const limit = quiz.violation_limit || 5;
+    if (newViolationCount >= limit) {
       const finalTimeline = [...timelineRef.current, { time: new Date().toLocaleTimeString(), reason: `AUTO-SUBMIT: ${reason}` }];
       handleFinish(newViolationCount, finalTimeline);
     }
@@ -1079,7 +1556,7 @@ function QuizSession({ quiz, questions, onFinish }) {
     const currentAnswers = answersRef.current;
 
     questions.forEach(q => {
-      const studentAnswer = (currentAnswers[q.id] || "").toString().toLowerCase().trim();
+      const studentAnswer = (currentAnswers[String(q.id)] || "").toString().toLowerCase().trim();
       const correctAnswer = (q.correct_option || "").toString().toLowerCase().trim();
       if (studentAnswer === correctAnswer && studentAnswer !== "") {
         score += q.point_value ?? 1;
@@ -1091,7 +1568,8 @@ function QuizSession({ quiz, questions, onFinish }) {
       score: score,
       total_marks: questions.reduce((acc, q) => acc + (q.point_value || 1), 0),
       eye_tracking_violations: currentViolations,
-      timeline: finalTimeline
+      timeline: finalTimeline,
+      answers: currentAnswers // Include answers so they are saved in DB
     };
 
     console.log("Submitting Result:", result);
@@ -1151,6 +1629,12 @@ function QuizSession({ quiz, questions, onFinish }) {
   const q = questions[currentIndex];
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
+  const [filterTab, setFilterTab] = useState("mcq");
+
+  const filteredQuestions = questions.filter(q => {
+    if (filterTab === "all") return true;
+    return (q.question_type || "mcq") === filterTab;
+  });
 
   return (
     <div className="flex flex-col gap-8 max-w-4xl mx-auto relative">
@@ -1198,7 +1682,7 @@ function QuizSession({ quiz, questions, onFinish }) {
               <div className="text-sm font-black uppercase tracking-widest text-red-500/60 flex items-center justify-center gap-2">
                 <span>Violation Strike {violations + 1}</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500/20" />
-                <span>Limit: 10</span>
+                <span>Limit: {quiz.violation_limit || 5}</span>
               </div>
             </div>
           </div>
@@ -1245,40 +1729,76 @@ function QuizSession({ quiz, questions, onFinish }) {
 
       {/* Forced List View of all questions */}
       <div className="flex flex-col gap-6">
-        <div className="bg-indigo-50 dark:bg-slate-800/50 p-6 rounded-2xl border border-indigo-100 dark:border-slate-700 text-center mb-4">
-          <h3 className="text-lg font-bold text-indigo-900 dark:text-indigo-200">Answer All Questions</h3>
-          <p className="text-sm text-indigo-600 dark:text-indigo-400">Scroll down to review and submit your answers.</p>
+        <div className="bg-indigo-50 dark:bg-slate-800/50 p-6 rounded-2xl border border-indigo-100 dark:border-slate-700 mb-4 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="text-center md:text-left">
+            <h3 className="text-lg font-bold text-indigo-900 dark:text-indigo-200">Answer All Questions</h3>
+            <p className="text-sm text-indigo-600 dark:text-indigo-400">Scroll down to review and submit your answers.</p>
+          </div>
+          {/* Tabs */}
+          <div className="flex gap-2 p-1 bg-white dark:bg-slate-900 rounded-xl shadow-sm">
+            {[{ id: 'mcq', label: 'MCQ' }, { id: 'true_false', label: 'T/F' }, { id: 'description', label: 'Description' }].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setFilterTab(tab.id)}
+                className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all ${filterTab === tab.id
+                  ? 'bg-indigo-500 text-white shadow-md'
+                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                  }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
+
         <div className="flex flex-col gap-6">
-          {questions.map((q, idx) => (
-            <div key={q.id || idx} id={`q-${q.id}`} className="bg-slate-800/40 border border-slate-700/50 rounded-3xl p-8 backdrop-blur-sm hover:border-indigo-500/30 transition-all group">
-              <div className="flex justify-between items-start mb-6">
-                <span className="bg-indigo-500/10 text-indigo-400 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-indigo-500/20">
-                  Question {idx + 1} • {q.point_value || 1} {q.point_value === 1 ? 'Point' : 'Points'}
-                </span>
+          {filteredQuestions.map((q, idx) => {
+            const qType = q.question_type || 'mcq';
+            return (
+              <div key={q.id || idx} id={`q-${q.id}`} className="bg-slate-800/40 border border-slate-700/50 rounded-3xl p-8 backdrop-blur-sm hover:border-indigo-500/30 transition-all group">
+                <div className="flex justify-between items-start mb-6">
+                  <span className="bg-indigo-500/10 text-indigo-400 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-indigo-500/20">
+                    Question {idx + 1} • {q.point_value || 1} {q.point_value === 1 ? 'Point' : 'Points'}
+                  </span>
+                </div>
+                <h3 className="text-xl font-medium text-slate-100 mb-8 leading-relaxed">
+                  {q.text}
+                </h3>
+
+                {qType === 'description' ? (
+                  <div className="flex flex-col gap-3">
+                    <label className="text-xs font-bold uppercase text-slate-500">Your Answer</label>
+                    <textarea
+                      className="w-full input-field p-6 rounded-2xl h-40 resize-none font-medium text-lg leading-relaxed focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-900 shadow-inner"
+                      placeholder="Type your detailed answer here..."
+                      value={answers[String(q.id)] || ''}
+                      onChange={(e) => setAnswers(prev => ({ ...prev, [String(q.id)]: e.target.value }))}
+                    />
+                  </div>
+                ) : (
+                  <div className={`grid grid-cols-1 ${qType === 'true_false' ? 'md:grid-cols-2' : 'md:grid-cols-2'} gap-4`}>
+                    {(qType === 'true_false' ? ['a', 'b'] : ['a', 'b', 'c', 'd']).map((opt) => (
+                      <button
+                        key={opt}
+                        onClick={() => setAnswers(prev => ({ ...prev, [String(q.id)]: opt }))}
+                        className={`p-5 rounded-2xl text-left transition-all border flex items-center gap-4 group/opt ${answers[String(q.id)] === opt
+                          ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg shadow-indigo-600/20'
+                          : 'bg-slate-900/50 border-slate-700 text-slate-400 hover:border-slate-500 hover:bg-slate-800'
+                          }`}
+                      >
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black uppercase transition-colors ${answers[String(q.id)] === opt ? 'bg-white text-indigo-600' : 'bg-slate-800 text-slate-500 group-hover/opt:bg-slate-700'}`}>
+                          {qType === 'true_false' ? (opt === 'a' ? 'T' : 'F') : opt}
+                        </div>
+                        <span className="font-medium">
+                          {qType === 'true_false' ? (opt === 'a' ? 'True' : 'False') : q[`option_${opt}`]}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-              <h3 className="text-xl font-medium text-slate-100 mb-8 leading-relaxed">
-                {q.text}
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {['a', 'b', 'c', 'd'].map((opt) => (
-                  <button
-                    key={opt}
-                    onClick={() => setAnswers(prev => ({ ...prev, [q.id]: opt }))}
-                    className={`p-5 rounded-2xl text-left transition-all border flex items-center gap-4 group/opt ${answers[q.id] === opt
-                      ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg shadow-indigo-600/20'
-                      : 'bg-slate-900/50 border-slate-700 text-slate-400 hover:border-slate-500 hover:bg-slate-800'
-                      }`}
-                  >
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black uppercase transition-colors ${answers[q.id] === opt ? 'bg-white text-indigo-600' : 'bg-slate-800 text-slate-500 group-hover/opt:bg-slate-700'}`}>
-                      {opt}
-                    </div>
-                    <span className="font-medium">{q[`option_${opt}`]}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
+            )
+          })}
 
           <div className="mt-8 p-8 bg-indigo-600/10 border border-indigo-500/20 rounded-3xl text-center">
             <h4 className="text-xl font-bold text-white mb-2">Ready to finish?</h4>
@@ -1305,7 +1825,7 @@ function QuizSession({ quiz, questions, onFinish }) {
             }}
             className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs transition-all duration-300 border-2 ${idx === currentIndex
               ? 'bg-indigo-600 text-white border-indigo-600 scale-110 shadow-lg'
-              : (answers[questions[idx].id]
+              : (answers[String(questions[idx].id)]
                 ? 'bg-green-500/20 text-green-500 border-green-500/20'
                 : 'bg-white dark:bg-slate-900 text-slate-400 border-slate-200 dark:border-slate-800 hover:border-indigo-400')
               }`}

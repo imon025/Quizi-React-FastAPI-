@@ -1,0 +1,38 @@
+----------------------------------------------------------------------------------
+INSTRUCTIONS
+----------------------------------------------------------------------------------
+1. Select the correct "Bulk Format" in the dashboard before uploading.
+2. Ensure your file contains ONLY the question type you selected.
+3. Use the pipe symbol (|) to separate the parts of your question.
+----------------------------------------------------------------------------------
+
+[FORMAT 1: MULTIPLE CHOICE (MCQ)]
+Select "Format: MCQ" in the dashboard.
+Format: Question Text | Option A | Option B | Option C | Option D | Correct Letter | Points
+
+Example:
+What is the capital of France? | London | Berlin | Paris | Madrid | c | 1
+Which planet is known as the Red Planet? | Earth | Mars | Jupiter | Venus | b | 2
+HTML stands for? | Hyper Text Markup Language | High Tech Modern Language | Hyper Transfer Mode Link | None | a | 1
+
+----------------------------------------------------------------------------------
+
+[FORMAT 2: TRUE / FALSE]
+Select "Format: T/F" in the dashboard.
+Format: Question Text | True or False | Points
+
+Example:
+The sun rises in the west. | False | 1
+Water boils at 100 degrees Celsius. | True | 1
+Python is a programming language. | True | 1
+
+----------------------------------------------------------------------------------
+
+[FORMAT 3: DESCRIPTION]
+Select "Format: Desc" in the dashboard.
+Format: Question Text | Points
+
+Example:
+Explain the theory of relativity in simple terms. | 5
+Describe the process of photosynthesis. | 3
+Write a short essay on the importance of education. | 10

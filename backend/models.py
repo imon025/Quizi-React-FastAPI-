@@ -71,12 +71,14 @@ class Quiz(Base):
     total_marks = Column(Integer)
     access_key = Column(String)
     attempts_count = Column(Integer, default=1)
+    max_questions = Column(Integer, default=0) # 0 means all questions
     
-    # Security & Shuffling
-    shuffle_questions = Column(Boolean, default=True)
-    shuffle_options = Column(Boolean, default=True)
+    # Security & Proctoring
+    shuffle_questions = Column(Boolean, default=False)
+    eye_tracking_enabled = Column(Boolean, default=False)
     fullscreen_required = Column(Boolean, default=False)
     tab_switch_detection = Column(Boolean, default=False)
+    violation_limit = Column(Integer, default=5)
     
     status = Column(String, default="draft")  # draft, scheduled, live, ended
     course_id = Column(Integer, ForeignKey("courses.id"))
@@ -96,6 +98,7 @@ class Question(Base):
     option_d = Column(String)
     correct_option = Column(String)  # 'a', 'b', 'c', or 'd'
     point_value = Column(Integer, default=1)
+    question_type = Column(String, default="mcq")  # 'mcq', 'true_false', 'description'
 
     quiz = relationship("Quiz", back_populates="questions")
 
@@ -108,6 +111,8 @@ class Result(Base):
     total_marks = Column(Integer)
     eye_tracking_violations = Column(Integer, default=0)
     timeline = Column(JSON, nullable=True)
+    answers = Column(JSON, nullable=True) # Stores student answers {q_id: answer}
+    feedback = Column(JSON, nullable=True) # Stores teacher feedback/marking {q_id: {score: 5, comment: "Good"}}
     completed_at = Column(DateTime(timezone=True), server_default=func.now())
 
     student = relationship("User", back_populates="results")

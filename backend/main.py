@@ -2,7 +2,8 @@ from fastapi import FastAPI, Depends, HTTPException, status
 from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from . import models, schemas, auth, database
+from backend import models, schemas, auth, database
+from sqlalchemy import func
 
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
@@ -93,6 +94,69 @@ def login(user_credentials: schemas.UserLogin, db: Session = Depends(get_db)):
 @app.get("/auth/me", response_model=schemas.UserResponse)
 def get_me(current_user: models.User = Depends(get_current_user)):
     return current_user
+
+@app.put("/auth/me", response_model=schemas.UserResponse)
+def update_me(user_update: schemas.UserUpdate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # If email is being updated, check if it's already taken
+    if user_update.email and user_update.email != current_user.email:
+        existing_user = db.query(models.User).filter(models.User.email == user_update.email).first()
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        current_user.email = user_update.email
+
+    if user_update.full_name:
+        current_user.full_name = user_update.full_name
+    if user_update.mobile:
+        current_user.mobile = user_update.mobile
+    if user_update.password:
+        current_user.hashed_password = auth.get_password_hash(user_update.password)
+    
+    # Optional fields
+    if user_update.student_id is not None:
+        current_user.student_id = user_update.student_id
+    if user_update.degree is not None:
+        current_user.degree = user_update.degree
+    if user_update.department is not None:
+        current_user.department = user_update.department
+    if user_update.university is not None:
+        current_user.university = user_update.university
+
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+# --- TEACHER UTILS ---
+
+@app.get("/teacher/students")
+def get_my_students(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.user_type != 1:
+        raise HTTPException(status_code=403, detail="Only teachers can view students")
+    
+    # Get all courses taught by this teacher
+    courses = current_user.taught_courses
+    students_data = []
+    
+    seen_student_ids = set()
+
+    for course in courses:
+        for enrollment in course.enrollments:
+            student = enrollment.student
+            # Unique students only? Or list per course?
+            # Request says "enroled student of user courses"
+            # Let's return a flat list of students with course info, or just students.
+            # Usually teachers want to see who is in which course.
+            
+            # Let's create a composite object
+            students_data.append({
+                "student_id": student.id,
+                "full_name": student.full_name,
+                "email": student.email,
+                "course_title": course.title,
+                "course_code": course.course_code,
+                "enrolled_at": enrollment.enrolled_at
+            })
+            
+    return students_data
 
 # --- COURSE ROUTES ---
 
@@ -264,6 +328,16 @@ def get_my_enrollments(current_user: models.User = Depends(get_current_user), db
 def get_course_quizzes(course_id: int, db: Session = Depends(get_db)):
     return db.query(models.Quiz).filter_by(course_id=course_id).all()
 
+@app.get("/quizzes/my", response_model=List[schemas.QuizResponse])
+def get_my_created_quizzes(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.user_type != 1:
+        raise HTTPException(status_code=403, detail="Only teachers can view their quizzes")
+    
+    # All quizzes from all courses taught by this teacher
+    # Efficient way: join Course
+    quizzes = db.query(models.Quiz).join(models.Course).filter(models.Course.teacher_id == current_user.id).all()
+    return quizzes
+
 @app.post("/quizzes/{quiz_id}/validate")
 def validate_quiz_key(quiz_id: int, key: str, db: Session = Depends(get_db)):
     quiz = db.query(models.Quiz).filter(models.Quiz.id == quiz_id).first()
@@ -292,19 +366,11 @@ def start_quiz(quiz_id: int, key: str, current_user: models.User = Depends(get_c
     # Randomized question selection
     import random
     all_questions = db.query(models.Question).filter_by(quiz_id=quiz_id).all()
-    count = min(len(all_questions), quiz.attempts_count or len(all_questions))
-    selected_questions = random.sample(all_questions, count)
     
-    # Shuffle options if enabled
-    if quiz.shuffle_options:
-        for q in selected_questions:
-            options = [q.option_a, q.option_b, q.option_c, q.option_d]
-            random.shuffle(options)
-            q.option_a, q.option_b, q.option_c, q.option_d = options
-            # Note: This shuffle in-memory might be tricky if not careful with DB state
-            # but for returning to frontend it works. Correct answer needs to be tracked.
-    
-    return selected_questions
+    if quiz.shuffle_questions:
+        random.shuffle(all_questions)
+        
+    return all_questions
 
 # --- QUESTION ROUTES ---
 
@@ -317,6 +383,14 @@ def create_question(question: schemas.QuestionCreate, current_user: models.User 
     db.add(new_question)
     db.commit()
     db.refresh(new_question)
+    
+    # Update Quiz Total Marks
+    quiz = db.query(models.Quiz).filter(models.Quiz.id == question.quiz_id).first()
+    if quiz:
+        total = db.query(func.sum(models.Question.point_value)).filter(models.Question.quiz_id == quiz.id).scalar() or 0
+        quiz.total_marks = total
+        db.commit()
+        
     return new_question
 
 @app.post("/quizzes/{quiz_id}/questions/bulk")
@@ -332,6 +406,12 @@ def bulk_upload_questions(quiz_id: int, questions: List[schemas.QuestionCreate],
     new_questions = [models.Question(**q.dict(exclude={'quiz_id'}), quiz_id=quiz_id) for q in questions]
     db.add_all(new_questions)
     db.commit()
+    
+    # Update Quiz Total Marks
+    total = db.query(func.sum(models.Question.point_value)).filter(models.Question.quiz_id == quiz_id).scalar() or 0
+    quiz.total_marks = total
+    db.commit()
+    
     return {"message": f"Successfully uploaded {len(new_questions)} questions"}
 
 @app.get("/quizzes/{quiz_id}/questions", response_model=List[schemas.QuestionResponse])
@@ -370,6 +450,13 @@ def update_question(question_id: int, question_update: schemas.QuestionBase, cur
     
     db.commit()
 
+    # Update Quiz Total Marks
+    quiz = db.query(models.Quiz).filter(models.Quiz.id == db_question.quiz_id).first()
+    if quiz:
+        total = db.query(func.sum(models.Question.point_value)).filter(models.Question.quiz_id == quiz.id).scalar() or 0
+        quiz.total_marks = total
+        db.commit()
+
     # Create notification
     notif = models.Notification(
         title="Quiz Content Updated",
@@ -390,8 +477,17 @@ def delete_question(question_id: int, current_user: models.User = Depends(get_cu
     if not db_question:
         raise HTTPException(status_code=404, detail="Question not found")
     
+    quiz_id = db_question.quiz_id
     db.delete(db_question)
     db.commit()
+    
+    # Update Quiz Total Marks
+    quiz = db.query(models.Quiz).filter(models.Quiz.id == quiz_id).first()
+    if quiz:
+        total = db.query(func.sum(models.Question.point_value)).filter(models.Question.quiz_id == quiz.id).scalar() or 0
+        quiz.total_marks = total
+        db.commit()
+        
     return {"message": "Question deleted successfully"}
 
 # --- QUIZ DELETION ---
@@ -417,15 +513,31 @@ def submit_quiz_result(result: schemas.ResultCreate, current_user: models.User =
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
 
-    # Simple server-side validation/grading could happen here if we passed answers
-    # For now we trust the frontend score or we can calculate it if answers are provided in result.data
-    # Let's assume result.data contains {question_id: selected_option}
+    # Server-side Grading Logic
+    questions = db.query(models.Question).filter(models.Question.quiz_id == result.quiz_id).all()
+    calculated_score = 0
+    calculated_total_marks = 0 # Verify total marks dynamically
     
+    user_answers = result.answers or {}
+    
+    for q in questions:
+        calculated_total_marks += q.point_value
+        ans = str(user_answers.get(str(q.id), "")).lower().strip()
+        
+        if q.question_type == 'description':
+            continue # Manual grading required, 0 points for now
+            
+        # MCQ and True/False Logic
+        correct = str(q.correct_option).lower().strip()
+        if ans == correct and ans != "":
+            calculated_score += q.point_value
+
     new_result = models.Result(
-        score=result.score,
-        total_marks=result.total_marks,
+        score=calculated_score,
+        total_marks=calculated_total_marks,
         eye_tracking_violations=result.eye_tracking_violations,
         timeline=result.timeline,
+        answers=result.answers,
         student_id=current_user.id,
         quiz_id=result.quiz_id
     )
@@ -433,6 +545,71 @@ def submit_quiz_result(result: schemas.ResultCreate, current_user: models.User =
     db.commit()
     db.refresh(new_result)
     return new_result
+
+@app.put("/results/{result_id}/grade")
+def grade_result(result_id: int, payload: dict, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.user_type != 1:
+        raise HTTPException(status_code=403, detail="Only teachers can grade")
+        
+    result = db.query(models.Result).filter(models.Result.id == result_id).first()
+    if not result:
+        raise HTTPException(status_code=404, detail="Result not found")
+        
+    # Verify course ownership
+    if result.quiz.course.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    # Payload can contain 'feedback' and 'answers'
+    feedback = payload.get("feedback", {})
+    answers = payload.get("answers", {})
+
+    # Update feedback
+    current_feedback = result.feedback or {}
+    current_feedback.update(feedback)
+    result.feedback = current_feedback
+
+    # Update answers if provided (Remarking feature)
+    if answers:
+        current_answers = result.answers or {}
+        current_answers.update(answers)
+        result.answers = current_answers
+    
+    # Commit interim state to allow recalculation logic to see updated answers
+    db.add(result)
+    db.commit()
+    db.refresh(result)
+    
+    # Recalculate Score
+    # 1. Start with Auto-graded score (re-verify)
+    questions = db.query(models.Question).filter(models.Question.quiz_id == result.quiz_id).all()
+    new_score = 0
+    user_answers = result.answers or {}
+
+    for q in questions:
+        ans = str(user_answers.get(str(q.id), "")).lower().strip()
+        
+        # Priority 1: Manual Score in Feedback (Override)
+        q_feed = current_feedback.get(str(q.id))
+        if q_feed and 'score' in q_feed:
+            try:
+                new_score += int(q_feed['score'])
+            except (ValueError, TypeError):
+                pass # faulty score payload
+        else:
+            # Priority 2: Auto-grading (Default for non-description)
+            if q.question_type == 'description':
+                # Description questions without manual score get 0 by default
+                pass 
+            else:
+                # Auto-grade check
+                correct = str(q.correct_option).lower().strip()
+                if ans == correct and ans != "":
+                    new_score += q.point_value
+    
+    result.score = new_score
+    db.commit()
+    db.refresh(result)
+    return result
 
 @app.get("/notifications", response_model=List[schemas.NotificationResponse])
 def get_notifications(db: Session = Depends(get_db)):

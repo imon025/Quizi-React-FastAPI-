@@ -8,7 +8,9 @@ import {
   PlusCircle,
   Plus,
   FileText,
+  ArrowRight,
   UserCheck,
+  User,
   Menu,
   X,
   Eye,
@@ -74,14 +76,18 @@ const MiniLineChart = ({ data, labels }) => (
 );
 
 export default function TeacherDashboard({ teacherData, onLogout }) {
-  const [activeTab, setActiveTab] = useState(localStorage.getItem("teacherActiveTab") || "dashboard");
-  const [selectedCourse, setSelectedCourse] = useState(null);
-  const [selectedQuiz, setSelectedQuiz] = useState(null);
+  const [activeTab, setActiveTab] = useState(localStorage.getItem("teacher_activeTab") || "overview");
+  const [selectedCourse, setSelectedCourse] = useState(() => {
+    const saved = localStorage.getItem("teacher_selectedCourse");
+    return saved && saved !== "undefined" ? JSON.parse(saved) : null;
+  });
+  const [selectedQuiz, setSelectedQuiz] = useState(() => {
+    const saved = localStorage.getItem("teacher_selectedQuiz");
+    return saved && saved !== "undefined" ? JSON.parse(saved) : null;
+  });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  useEffect(() => {
-    localStorage.setItem("teacherActiveTab", activeTab);
-  }, [activeTab]);
+  // Removed localStorage persistence for activeTab
   const [myCourses, setMyCourses] = useState([]);
   const [showCreateCourse, setShowCreateCourse] = useState(false);
   const [showCreateQuiz, setShowCreateQuiz] = useState(false);
@@ -111,11 +117,61 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
   const [courseQuizzes, setCourseQuizzes] = useState([]);
   const [allQuizzes, setAllQuizzes] = useState([]);
   const [quizSearchQuery, setQuizSearchQuery] = useState("");
+  const [myStudents, setMyStudents] = useState([]);
+  const [studentCourseFilter, setStudentCourseFilter] = useState('all');
+  const [quizCourseFilter, setQuizCourseFilter] = useState('all');
   const [allResults, setAllResults] = useState([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const [bulkType, setBulkType] = useState(localStorage.getItem("teacher_bulkType") || 'mcq');
+
+  useEffect(() => {
+    localStorage.setItem("teacher_activeTab", activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    localStorage.setItem("teacher_selectedCourse", JSON.stringify(selectedCourse));
+  }, [selectedCourse]);
+
+  useEffect(() => {
+    localStorage.setItem("teacher_selectedQuiz", JSON.stringify(selectedQuiz));
+  }, [selectedQuiz]);
+
+  useEffect(() => {
+    localStorage.setItem("teacher_bulkType", bulkType);
+  }, [bulkType]);
+  // Result Review and Grading
+  const [selectedAttempt, setSelectedAttempt] = useState(null);
+  const [showGradingModal, setShowGradingModal] = useState(false);
+  const [isGrading, setIsGrading] = useState(false);
+  const [gradingModalQuestions, setGradingModalQuestions] = useState([]); // Questions for the currently reviewed attempt
+
+  useEffect(() => {
+    if (selectedAttempt && showGradingModal) {
+      // Fetch questions specifically for this attempt to ensure we have the full list
+      const token = localStorage.getItem("token");
+      fetch(`http://127.0.0.1:8000/quizzes/${selectedAttempt.quiz_id}/questions`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      })
+        .then(res => res.json())
+        .then(data => setGradingModalQuestions(data))
+        .catch(err => console.error("Error fetching questions for grading", err));
+    } else {
+      setGradingModalQuestions([]);
+    }
+  }, [selectedAttempt, showGradingModal]);
+
+  // New: active tab for answers in grading modal
+  const [gradingAnswerTab, setGradingAnswerTab] = useState("all");
+  useEffect(() => { if (selectedAttempt) setGradingAnswerTab("all"); }, [selectedAttempt]);
+
+  // Hierarchical Result Navigation
+  const [gradingFlow, setGradingFlow] = useState('COURSES'); // COURSES, QUIZZES, RESULTS
+  const [gradingCourse, setGradingCourse] = useState(null);
+  const [gradingQuiz, setGradingQuiz] = useState(null);
+  const [gradingQuizzes, setGradingQuizzes] = useState([]);
 
   const fetchMyCourses = async () => {
     try {
@@ -139,11 +195,26 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
     } catch (err) { console.error(err); }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem("teacher_activeTab");
+    localStorage.removeItem("teacher_selectedCourse");
+    localStorage.removeItem("teacher_selectedQuiz");
+    localStorage.removeItem("teacher_bulkType");
+    onLogout();
+  };
+
+  useEffect(() => {
+    if (selectedCourse) {
+      fetchCourseQuizzes(selectedCourse.id);
+    }
+  }, [refreshKey]);
+
   useEffect(() => {
     fetchMyCourses();
     fetchNotifications();
     fetchAllQuizzes();
     fetchAllResults();
+    fetchMyStudents();
 
     // POLLING: Every 30 seconds
     const interval = setInterval(() => {
@@ -151,6 +222,7 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
       fetchNotifications();
       fetchAllQuizzes();
       fetchAllResults();
+      fetchMyStudents();
     }, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -158,11 +230,26 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
   const fetchAllQuizzes = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("http://127.0.0.1:8000/quizzes/all", {
+      // CHANGED: Fetch my created quizzes instead of all public ones
+      const res = await fetch("http://127.0.0.1:8000/quizzes/my", {
         headers: { "Authorization": `Bearer ${token}` }
       });
-      const data = await res.json();
-      setAllQuizzes(data);
+      if (res.ok) {
+        const data = await res.json();
+        setAllQuizzes(data);
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  const fetchMyStudents = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch("http://127.0.0.1:8000/teacher/students", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setMyStudents(await res.json());
+      }
     } catch (err) { console.error(err); }
   };
 
@@ -206,9 +293,16 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
 
   const fetchCourseQuizzes = async (courseId) => {
     try {
-      const res = await fetch(`http://127.0.0.1:8000/courses/${courseId}/quizzes`);
-      const data = await res.json();
-      setCourseQuizzes(data);
+      const token = localStorage.getItem("token");
+      const res = await fetch(`http://127.0.0.1:8000/courses/${courseId}/quizzes`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCourseQuizzes(data);
+      } else {
+        console.error("Failed to fetch quizzes");
+      }
     } catch (err) {
       console.error("Failed to fetch quizzes", err);
     }
@@ -261,11 +355,11 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
     total_marks: 100,
     access_key: "",
     attempts_count: 1,
-    shuffle_questions: true,
-    shuffle_options: true,
+    shuffle_questions: false,
+    eye_tracking_enabled: false,
     fullscreen_required: false,
     tab_switch_detection: false,
-    max_questions: 0,
+    violation_limit: 5,
     status: "draft"
   });
 
@@ -304,10 +398,11 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
           total_marks: 100,
           access_key: "",
           attempts_count: 1,
-          shuffle_questions: true,
-          shuffle_options: true,
+          shuffle_questions: false,
+          eye_tracking_enabled: false,
           fullscreen_required: false,
           tab_switch_detection: false,
+          violation_limit: 5,
           status: "draft"
         });
         fetchCourseQuizzes(selectedCourse.id);
@@ -343,6 +438,11 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
       end_time: new Date(editingQuiz.end_time).toISOString(),
       deadline: editingQuiz.deadline ? new Date(editingQuiz.deadline).toISOString() : null,
     };
+    // Clean legacy fields
+    delete formattedQuiz.max_questions;
+    delete formattedQuiz.max_questions;
+    // delete formattedQuiz.shuffle_questions; // Restored
+    delete formattedQuiz.shuffle_options;
 
     try {
       const response = await fetch(`http://127.0.0.1:8000/quizzes/${editingQuiz.id}`, {
@@ -399,14 +499,18 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({ ...newQuestion, quiz_id: selectedQuiz.id })
+        body: JSON.stringify({
+          ...newQuestion,
+          quiz_id: selectedQuiz.id,
+          question_type: newQuestion.question_type || newQuestion.type || 'mcq'
+        })
       });
       if (res.ok) {
         alert("Question added successfully!");
         setRefreshKey(prev => prev + 1);
         setShowAddQuestion(false);
         setNewQuestion({
-          text: "", type: "mcq", option_a: "", option_b: "", option_c: "", option_d: "", correct_option: "", point_value: 1
+          text: "", question_type: "mcq", option_a: "", option_b: "", option_c: "", option_d: "", correct_option: "", point_value: 1
         });
       } else {
         const errorData = await res.json();
@@ -446,7 +550,6 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
   };
 
   const handleDeleteQuestion = async (questionId) => {
-    if (!confirm("Are you sure you want to delete this question?")) return;
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`http://127.0.0.1:8000/questions/${questionId}`, {
@@ -531,20 +634,46 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
 
         // Map various possible field names to our backend schema
         const mappedQuestions = questions.map(q => {
+          let type = (q.type || q.question_type || "mcq").toLowerCase().trim();
+          if (!['mcq', 'true_false', 'description'].includes(type)) type = "mcq";
+
           // Robustly get the correct option (handle case, trim, fallback)
           let correct = (q.correct_option || q.correct_answer || q.answer || "").toString().toLowerCase().trim();
-          // If it's a full word like "alpha" or "option a", just take the first letter if it's a/b/c/d
-          if (correct.includes("option ")) correct = correct.replace("option ", "");
-          if (correct.length > 1 && ["a", "b", "c", "d"].includes(correct[0])) correct = correct[0];
+
+          let optA = (q.option_a || q.optionA || (q.options && (q.options.a || q.options.A)) || "").toString().trim();
+          let optB = (q.option_b || q.optionB || (q.options && (q.options.b || q.options.B)) || "").toString().trim();
+          let optC = (q.option_c || q.optionC || (q.options && (q.options.c || q.options.C)) || "").toString().trim();
+          let optD = (q.option_d || q.optionD || (q.options && (q.options.d || q.options.D)) || "").toString().trim();
+
+          if (type === 'true_false') {
+            optA = "True";
+            optB = "False";
+            optC = "";
+            optD = "";
+            // Ensure correct answer is mapped to 'a' (true) or 'b' (false)
+            if (correct === 'true' || correct === 't') correct = 'a';
+            if (correct === 'false' || correct === 'f') correct = 'b';
+          } else if (type === 'description') {
+            optA = "";
+            optB = "";
+            optC = "";
+            optD = "";
+            correct = "";
+          } else {
+            // MCQ logic
+            if (correct.includes("option ")) correct = correct.replace("option ", "");
+            if (correct.length > 1 && ["a", "b", "c", "d"].includes(correct[0])) correct = correct[0];
+          }
 
           return {
             text: (q.text || q.question || q.Question || "").toString().trim(),
-            option_a: (q.option_a || q.optionA || (q.options && (q.options.a || q.options.A)) || "").toString().trim(),
-            option_b: (q.option_b || q.optionB || (q.options && (q.options.b || q.options.B)) || "").toString().trim(),
-            option_c: (q.option_c || q.optionC || (q.options && (q.options.c || q.options.C)) || "").toString().trim(),
-            option_d: (q.option_d || q.optionD || (q.options && (q.options.d || q.options.D)) || "").toString().trim(),
+            option_a: optA,
+            option_b: optB,
+            option_c: optC,
+            option_d: optD,
             correct_option: ["a", "b", "c", "d"].includes(correct) ? correct : "a",
-            point_value: parseInt(q.point_value || q.marks || q.points) || 1
+            point_value: parseInt(q.point_value || q.marks || q.points) || 1,
+            question_type: type
           };
         });
 
@@ -672,30 +801,83 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
 
           // Split by | trimming each part
           const parts = line.split('|').map(p => p.trim());
-          if (parts.length < 6) {
-            console.warn(`Skipping line ${i + 1} due to insufficient parts:`, line);
-            continue;
-          }
 
-          questions.push({
-            text: parts[0],
-            option_a: parts[1],
-            option_b: parts[2],
-            option_c: parts[3],
-            option_d: parts[4],
-            correct_option: parts[5].toLowerCase(),
-            point_value: parseInt(parts[6]) || 1
-          });
+          if (bulkType === 'true_false') {
+            if (parts.length < 3) {
+              console.warn(`Skipping T/F line ${i + 1}: Insufficient parts`, line);
+              continue;
+            }
+            let correct = parts[1].toLowerCase();
+            if (correct === 'true' || correct === 't') correct = 'a';
+            else if (correct === 'false' || correct === 'f') correct = 'b';
+            else correct = 'a'; // default
+
+            questions.push({
+              text: parts[0],
+              question_type: 'true_false',
+              option_a: 'True',
+              option_b: 'False',
+              option_c: '',
+              option_d: '',
+              correct_option: correct,
+              point_value: parseInt(parts[2]) || 1
+            });
+
+          } else if (bulkType === 'description') {
+            if (parts.length < 2) {
+              console.warn(`Skipping Desc line ${i + 1}: Insufficient parts`, line);
+              continue;
+            }
+            questions.push({
+              text: parts[0],
+              question_type: 'description',
+              option_a: '',
+              option_b: '',
+              option_c: '',
+              option_d: '',
+              correct_option: '',
+              point_value: parseInt(parts[1]) || 1
+            });
+
+          } else {
+            // MCQ (Default, matches 'mcq')
+            if (parts.length < 6) {
+              console.warn(`Skipping MCQ line ${i + 1} due to insufficient parts:`, line);
+              continue;
+            }
+            questions.push({
+              text: parts[0],
+              question_type: 'mcq',
+              option_a: parts[1],
+              option_b: parts[2],
+              option_c: parts[3],
+              option_d: parts[4],
+              correct_option: (parts[5] || 'a').toString().toLowerCase(),
+              point_value: parseInt(parts[6]) || 1
+            });
+          }
         }
-        console.log("Parsed questions from TXT:", questions);
+        console.log("Parsed questions from TXT (" + bulkType + "):", questions);
 
         if (questions.length === 0) {
-          alert("No questions found in file. Format: Question | A | B | C | D | CorrectLetter | Points");
+          let format = "Question | A | B | C | D | CorrectLetter | Points";
+          if (bulkType === 'true_false') format = "Question | True/False | Points";
+          if (bulkType === 'description') format = "Question | Points";
+
+          alert(`UPLOAD FAILED: No valid questions found.\n\nYou selected '${bulkType.toUpperCase()}' format. Ensure your file matches this format:\n\n${format}`);
+          return;
+        }
+
+        if (!selectedQuiz || !selectedQuiz.id) {
+          alert("Error: No quiz selected. Please select a quiz before uploading.");
           return;
         }
 
         const token = localStorage.getItem("token");
-        const res = await fetch(`http://127.0.0.1:8000/quizzes/${selectedQuiz.id}/questions/bulk`, {
+        const url = `http://127.0.0.1:8000/quizzes/${selectedQuiz.id}/questions/bulk`;
+        console.log("Bulk Upload Start:", { url, count: questions.length, bulkType });
+
+        const res = await fetch(url, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -705,24 +887,21 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
         });
 
         if (res.ok) {
-          alert(`Successfully uploaded ${questions.length} questions!`);
+          alert(`SUCCESS: Uploaded ${questions.length} questions successfully!`);
           setRefreshKey(prev => prev + 1);
         } else {
-          const error = await res.json();
-          console.error("Bulk Upload Error:", error);
-          let msg = "Failed to upload questions.";
-          if (error.detail) {
-            if (Array.isArray(error.detail)) {
-              msg += "\nValidation Errors:\n" + error.detail.map(d => `${d.loc.join('.')}: ${d.msg}`).join("\n");
-            } else {
-              msg += "\nError: " + error.detail;
-            }
+          let errorDetail = "";
+          try {
+            const error = await res.json();
+            errorDetail = Array.isArray(error.detail) ? error.detail.map(d => d.msg).join(", ") : error.detail;
+          } catch (e) {
+            errorDetail = await res.text() || "Unknown server error (non-JSON response)";
           }
-          alert(msg);
+          alert(`UPLOAD FAILED (Status ${res.status}):\n${errorDetail}`);
         }
       } catch (err) {
         console.error("Upload process error:", err);
-        alert("Error parsing text file. Ensure it follows the format: Question | A | B | C | D | CorrectLetter | Points");
+        alert(`NETWORK ERROR: Failed to connect to server.\n\nDetails: ${err.message}\n\nPlease ensure the backend is running at http://127.0.0.1:8000`);
       }
     };
     reader.readAsText(file);
@@ -759,7 +938,12 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
             active={activeTab === "courses"}
             onClick={() => { setActiveTab("courses"); setIsSidebarOpen(false); }}
           />
-          <SidebarItem icon={<Users size={18} />} label="Students" />
+          <SidebarItem
+            icon={<Users size={18} />}
+            label="Students"
+            active={activeTab === "students"}
+            onClick={() => { setActiveTab("students"); setIsSidebarOpen(false); }}
+          />
           <SidebarItem
             icon={<FileText size={18} />}
             label="Quizzes"
@@ -767,11 +951,24 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
             onClick={() => { setActiveTab("all-quizzes"); setIsSidebarOpen(false); }}
           />
           <SidebarItem
+            icon={<CheckCircle size={18} />}
+            label="Check Answer"
+            active={activeTab === "quiz-results"}
+            onClick={() => {
+              setActiveTab("quiz-results");
+              setGradingFlow('COURSES');
+              setGradingCourse(null);
+              setGradingQuiz(null);
+              setIsSidebarOpen(false);
+            }}
+          />
+          <SidebarItem
             icon={<BarChart3 size={18} />}
             label="Reports"
             active={activeTab === "reports"}
             onClick={() => { setActiveTab("reports"); setIsSidebarOpen(false); }}
           />
+
         </nav>
 
 
@@ -781,7 +978,13 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
             label={theme === 'light' ? "Dark Mode" : "Light Mode"}
             onClick={toggleTheme}
           />
-          <SidebarItem icon={<LogOut size={18} />} label="Logout" onClick={onLogout} />
+          <SidebarItem
+            icon={<User size={18} />}
+            label="Profile"
+            active={activeTab === "profile"}
+            onClick={() => { setActiveTab("profile"); setIsSidebarOpen(false); }}
+          />
+          <SidebarItem icon={<LogOut size={18} />} label="Logout" onClick={handleLogout} />
         </div>
       </aside>
 
@@ -837,186 +1040,605 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                 </div>
               )}
             </div>
-            <button className="hidden sm:block btn-primary flex items-center gap-2 px-6 py-3 rounded-xl transition" onClick={() => setShowCreateCourse(true)}>
-              <PlusCircle size={18} />
-              Create Course
+            <button className="hidden sm:block btn-primary px-4 py-2 rounded-lg transition text-sm font-bold shadow-lg shadow-indigo-500/20 whitespace-nowrap" onClick={() => setShowCreateCourse(true)}>
+              <span className="inline-flex items-center gap-2">
+                <PlusCircle size={16} />
+                <span className="leading-none">Create Course</span>
+              </span>
             </button>
           </div>
         </div>
 
-        {activeTab === "overview" && (() => {
-          // Calculate dynamic data for charts
-          const last7Days = [...Array(7)].map((_, i) => {
-            const d = new Date();
-            d.setDate(d.getDate() - i);
-            return d.toISOString().split('T')[0];
-          }).reverse();
+        {/* Content Area - Scrollable */}
+        <div className="content-area">
 
-          const engagementData = last7Days.map(date =>
-            allResults.filter(r => r.completed_at.startsWith(date)).length
-          );
-          const engagementLabels = last7Days.map(date => {
-            const d = new Date(date);
-            return d.toLocaleDateString('en-US', { weekday: 'short' });
-          });
+          {activeTab === "overview" && (() => {
+            // Calculate dynamic data for charts
+            const last7Days = [...Array(7)].map((_, i) => {
+              const d = new Date();
+              d.setDate(d.getDate() - i);
+              return d.toISOString().split('T')[0];
+            }).reverse();
 
-          const gradeBuckets = [
-            { label: '0-20%', min: 0, max: 0.2 },
-            { label: '21-40%', min: 0.2, max: 0.4 },
-            { label: '41-60%', min: 0.4, max: 0.6 },
-            { label: '61-80%', min: 0.6, max: 0.8 },
-            { label: '81-100%', min: 0.8, max: 1.1 },
-          ];
+            const engagementData = last7Days.map(date =>
+              allResults.filter(r => r.completed_at.startsWith(date)).length
+            );
+            const engagementLabels = last7Days.map(date => {
+              const d = new Date(date);
+              return d.toLocaleDateString('en-US', { weekday: 'short' });
+            });
 
-          const distributionData = gradeBuckets.map(bucket =>
-            allResults.filter(r => {
-              const ratio = r.score / r.total_marks;
-              return ratio >= bucket.min && ratio < bucket.max;
-            }).length
-          );
-          const distributionLabels = gradeBuckets.map(b => b.label);
+            const gradeBuckets = [
+              { label: '0-20%', min: 0, max: 0.2 },
+              { label: '21-40%', min: 0.2, max: 0.4 },
+              { label: '41-60%', min: 0.4, max: 0.6 },
+              { label: '61-80%', min: 0.6, max: 0.8 },
+              { label: '81-100%', min: 0.8, max: 1.1 },
+            ];
 
-          return (
-            <>
-              <div className="stats-grid">
-                <StatCard
-                  title="Total Students"
-                  value={new Set(allResults.map(r => r.student_id)).size}
-                  trend="Unique enrolled"
-                  icon={<Users size={24} />}
-                />
-                <StatCard
-                  title="Live Courses"
-                  value={myCourses.length}
-                  trend="Active"
-                  icon={<Layers size={24} />}
-                />
-                <StatCard
-                  title="Quizzes Held"
-                  value={allResults.length}
-                  trend="Total attempts"
-                  icon={<FileText size={24} />}
-                />
-                <StatCard
-                  title="Avg. Score"
-                  value={allResults.length > 0
-                    ? `${(allResults.reduce((acc, r) => acc + (r.score / r.total_marks), 0) / allResults.length * 100).toFixed(1)}%`
-                    : "0%"
-                  }
-                  trend="Class performance"
-                  icon={<UserCheck size={24} />}
-                />
-              </div>
+            const distributionData = gradeBuckets.map(bucket =>
+              allResults.filter(r => {
+                const ratio = r.score / r.total_marks;
+                return ratio >= bucket.min && ratio < bucket.max;
+              }).length
+            );
+            const distributionLabels = gradeBuckets.map(b => b.label);
 
-              <div className="charts">
-                <div className="chart-card">
-                  <div className="flex justify-between items-center mb-6">
-                    <div>
-                      <h2 className="chart-title mb-0">Class Engagement</h2>
-                      <p className="text-xs text-slate-500">Quiz attempts in the last 7 days</p>
+            return (
+              <>
+                <div className="stats-grid">
+                  <StatCard
+                    title="Total Students"
+                    value={new Set(allResults.map(r => r.student_id)).size}
+                    trend="Unique enrolled"
+                    icon={<Users size={24} />}
+                  />
+                  <StatCard
+                    title="Live Courses"
+                    value={myCourses.length}
+                    trend="Active"
+                    icon={<Layers size={24} />}
+                  />
+                  <StatCard
+                    title="Quizzes Held"
+                    value={allResults.length}
+                    trend="Total attempts"
+                    icon={<FileText size={24} />}
+                  />
+                  <StatCard
+                    title="Avg. Score"
+                    value={allResults.length > 0
+                      ? `${(allResults.reduce((acc, r) => acc + (r.score / r.total_marks), 0) / allResults.length * 100).toFixed(1)}%`
+                      : "0%"
+                    }
+                    trend="Class performance"
+                    icon={<UserCheck size={24} />}
+                  />
+                </div>
+
+                <div className="charts">
+                  <div className="chart-card">
+                    <div className="flex justify-between items-center mb-6">
+                      <div>
+                        <h2 className="chart-title mb-0">Class Engagement</h2>
+                        <p className="text-xs text-slate-500">Quiz attempts in the last 7 days</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-3 h-3 bg-indigo-500 rounded-full"></span>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase">Attempts</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 bg-indigo-500 rounded-full"></span>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase">Attempts</span>
+                    <MiniLineChart data={engagementData} labels={engagementLabels} />
+                  </div>
+                  <div className="chart-card">
+                    <div className="flex justify-between items-center mb-6">
+                      <div>
+                        <h2 className="chart-title mb-0">Grade Distribution</h2>
+                        <p className="text-xs text-slate-500">Score ranges across all results</p>
+                      </div>
+                    </div>
+                    <BarChart data={distributionData} labels={distributionLabels} color="#10b981" />
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+
+          {activeTab === "courses" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {myCourses.map(course => (
+                <div key={course.id} className="chart-card flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="text-xl font-bold">{course.title}</h3>
+                      <span className="text-xs bg-indigo-500/20 text-indigo-400 px-2 py-1 rounded-md font-mono">{course.course_code}</span>
+                    </div>
+                    <p className="text-gray-400 text-sm mb-4 line-clamp-2">{course.description}</p>
+                    <div className="flex items-center gap-2 text-xs text-gray-500 mb-4">
+                      <Database size={12} /> {course.subject} • {course.semester}
                     </div>
                   </div>
-                  <MiniLineChart data={engagementData} labels={engagementLabels} />
-                </div>
-                <div className="chart-card">
-                  <div className="flex justify-between items-center mb-6">
-                    <div>
-                      <h2 className="chart-title mb-0">Grade Distribution</h2>
-                      <p className="text-xs text-slate-500">Score ranges across all results</p>
-                    </div>
-                  </div>
-                  <BarChart data={distributionData} labels={distributionLabels} color="#10b981" />
-                </div>
-              </div>
-            </>
-          );
-        })()}
-
-        {activeTab === "courses" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {myCourses.map(course => (
-              <div key={course.id} className="chart-card flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="text-xl font-bold">{course.title}</h3>
-                    <span className="text-xs bg-indigo-500/20 text-indigo-400 px-2 py-1 rounded-md font-mono">{course.course_code}</span>
-                  </div>
-                  <p className="text-gray-400 text-sm mb-4 line-clamp-2">{course.description}</p>
-                  <div className="flex items-center gap-2 text-xs text-gray-500 mb-4">
-                    <Database size={12} /> {course.subject} • {course.semester}
+                  <div className="flex gap-2">
+                    <button
+                      className="flex-1 btn-primary py-2 rounded-lg text-sm transition"
+                      onClick={() => { setSelectedCourse(course); setActiveTab("course-detail"); }}
+                    >
+                      Manage
+                    </button>
+                    <button
+                      className="flex-1 bg-pink-600/20 text-pink-400 border border-pink-600/30 py-2 rounded-lg text-sm hover:bg-pink-600 hover:text-white transition"
+                      onClick={() => {
+                        if (deleteCourseId === course.id) {
+                          handleDeleteCourse(course.id);
+                        } else {
+                          setDeleteCourseId(course.id);
+                          setDeleteCountdown(5);
+                        }
+                      }}
+                    >
+                      {deleteCourseId === course.id ? (
+                        deleteCountdown > 0 ? `Wait ${deleteCountdown}s...` : "Confirm Delete"
+                      ) : (
+                        "Delete"
+                      )}
+                    </button>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    className="flex-1 btn-primary py-2 rounded-lg text-sm transition"
-                    onClick={() => { setSelectedCourse(course); setActiveTab("course-detail"); }}
-                  >
-                    Manage
-                  </button>
-                  <button
-                    className="flex-1 bg-pink-600/20 text-pink-400 border border-pink-600/30 py-2 rounded-lg text-sm hover:bg-pink-600 hover:text-white transition"
-                    onClick={() => {
-                      if (deleteCourseId === course.id) {
-                        handleDeleteCourse(course.id);
-                      } else {
-                        setDeleteCourseId(course.id);
-                        setDeleteCountdown(5);
-                      }
-                    }}
-                  >
-                    {deleteCourseId === course.id ? (
-                      deleteCountdown > 0 ? `Wait ${deleteCountdown}s...` : "Confirm Delete"
-                    ) : (
-                      "Delete"
-                    )}
-                  </button>
-                </div>
-              </div>
-            ))}
-            <div
-              className="chart-card border-dashed border-2 border-slate-700 flex flex-col items-center justify-center cursor-pointer hover:border-indigo-500 transition group"
-              onClick={() => setShowCreateCourse(true)}
-            >
-              <PlusCircle size={48} className="text-gray-600 group-hover:text-indigo-500 mb-2" />
-              <p className="text-gray-500 group-hover:text-indigo-400 font-medium">Create New Course</p>
-            </div>
-          </div>
-        )}
-
-        {activeTab === "course-detail" && selectedCourse && (
-          <div className="flex flex-col gap-8">
-            <div className="flex justify-between items-end">
-              <div>
-                <button
-                  className="text-indigo-400 text-sm mb-2 hover:underline flex items-center gap-1"
-                  onClick={() => setActiveTab("courses")}
-                >
-                  ← Back to Courses
-                </button>
-                <h2 className="text-3xl font-bold">{selectedCourse.title}</h2>
-                <p className="text-gray-400">{selectedCourse.course_code} • {selectedCourse.subject}</p>
-              </div>
-              <button
-                className="btn-primary flex items-center gap-2 px-6 py-3 rounded-xl shadow-lg shadow-indigo-500/20"
-                onClick={() => setShowCreateQuiz(true)}
+              ))}
+              <div
+                className="chart-card border-dashed border-2 border-slate-700 flex flex-col items-center justify-center cursor-pointer hover:border-indigo-500 transition group"
+                onClick={() => setShowCreateCourse(true)}
               >
-                <PlusCircle size={18} />
-                Create New Quiz
-              </button>
+                <PlusCircle size={48} className="text-gray-600 group-hover:text-indigo-500 mb-2" />
+                <p className="text-gray-500 group-hover:text-indigo-400 font-medium">Create New Course</p>
+              </div>
             </div>
+          )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2 flex flex-col gap-6">
-                <h3 className="text-xl font-bold flex items-center gap-2">
-                  <FileText size={20} className="text-indigo-400" />
-                  Active Quizzes
-                </h3>
-                <div className="grid grid-cols-1 gap-4">
-                  {courseQuizzes.map(quiz => (
+          {activeTab === "course-detail" && selectedCourse && (
+            <div className="flex flex-col gap-8">
+              <div className="flex justify-between items-end">
+                <div>
+                  <button
+                    className="text-indigo-400 text-sm mb-2 hover:underline flex items-center gap-1"
+                    onClick={() => setActiveTab("courses")}
+                  >
+                    ← Back to Courses
+                  </button>
+                  <h2 className="text-3xl font-bold">{selectedCourse.title}</h2>
+                  <p className="text-gray-400">{selectedCourse.course_code} • {selectedCourse.subject}</p>
+                </div>
+                <button
+                  className="btn-primary flex items-center gap-2 px-6 py-3 rounded-xl shadow-lg shadow-indigo-500/20"
+                  onClick={() => setShowCreateQuiz(true)}
+                >
+                  <PlusCircle size={18} />
+                  Create New Quiz
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 flex flex-col gap-6">
+                  <h3 className="text-xl font-bold flex items-center gap-2">
+                    <FileText size={20} className="text-indigo-400" />
+                    Active Quizzes
+                  </h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    {courseQuizzes.map(quiz => (
+                      <div key={quiz.id} className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl flex justify-between items-center group hover:border-indigo-500 transition shadow-sm dark:shadow-none">
+                        <div className="flex gap-4 items-center">
+                          <div className="p-3 bg-indigo-500/10 text-indigo-500 rounded-xl">
+                            <FileText size={20} />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-lg text-slate-900 dark:text-white">{quiz.title}</h4>
+                            <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-gray-400 mt-1">
+                              <span className="flex items-center gap-1"><Clock size={12} /> {quiz.duration}m</span>
+                              <span className="flex items-center gap-1"><Key size={12} /> {quiz.access_key}</span>
+                              <span className={`px-2 py-0.5 rounded-full ${quiz.status === 'published' ? 'bg-green-500/10 text-green-600 dark:text-green-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-gray-300'}`}>
+                                {quiz.status}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            className="bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 border border-indigo-600/20 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-600 hover:text-white transition"
+                            onClick={() => { setSelectedQuiz(quiz); setActiveTab("question-management"); }}
+                          >
+                            Questions
+                          </button>
+                          <div className="flex gap-2">
+                            <button
+                              className="bg-slate-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 px-3 py-2 rounded-lg hover:bg-indigo-600 hover:text-white transition"
+                              onClick={() => {
+                                const start = new Date(quiz.start_time).toISOString().slice(0, 16);
+                                const end = new Date(quiz.end_time).toISOString().slice(0, 16);
+                                const deadline = quiz.deadline ? new Date(quiz.deadline).toISOString().slice(0, 16) : "";
+                                setEditingQuiz({ ...quiz, start_time: start, end_time: end, deadline: deadline });
+                                setShowEditQuiz(true);
+                              }}
+                              title="Edit Quiz"
+                            >
+                              <Pencil size={18} />
+                            </button>
+                            <button
+                              className="bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-red-500 rounded-lg px-3 py-2 transition"
+                              onClick={() => {
+                                if (window.confirm("Are you sure you want to delete this quiz? This will also remove all its questions and results.")) {
+                                  handleDeleteQuiz(quiz.id);
+                                }
+                              }}
+                              title="Delete Quiz"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {courseQuizzes.length === 0 && (
+                      <div className="bg-slate-50 dark:bg-slate-800/30 border-2 border-dashed border-slate-200 dark:border-slate-800 p-12 rounded-2xl flex flex-col items-center justify-center text-center">
+                        <FileText size={48} className="text-slate-300 dark:text-slate-700 mb-4" />
+                        <p className="text-slate-500 font-medium">No quizzes created yet for this course.</p>
+                        <button
+                          className="text-indigo-600 dark:text-indigo-400 hover:underline mt-2"
+                          onClick={() => setShowCreateQuiz(true)}
+                        >
+                          Create your first quiz
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-6">
+                  <h3 className="text-xl font-bold flex items-center gap-2">
+                    <Shield size={20} className="text-indigo-400" />
+                    Course Settings
+                  </h3>
+                  <div className="chart-card flex flex-col gap-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium">Allow Self-Join</span>
+                      <input type="checkbox" checked={selectedCourse.self_join_enabled} readOnly className="w-4 h-4 rounded text-indigo-600" />
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium">Semester</span>
+                      <span className="text-sm text-gray-400">{selectedCourse.semester}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium">Batch</span>
+                      <span className="text-sm text-gray-400">{selectedCourse.batch}</span>
+                    </div>
+                    <div className="flex justify-between items-center group">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium">Course Access Key</span>
+                        <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Required for Student Enrollment</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <code className="bg-indigo-500/10 text-indigo-400 px-3 py-1 rounded-lg font-black tracking-widest border border-indigo-500/20">
+                          {selectedCourse.access_key || "NONE"}
+                        </code>
+                        <Key size={14} className="text-indigo-400 opacity-40" />
+                      </div>
+                    </div>
+                    <button className="w-full border border-slate-700 py-2 rounded-lg text-sm hover:bg-slate-800 transition mt-4" onClick={() => setShowEditCourse(true)}>
+                      Edit Course Details
+                    </button>
+                    <button
+                      className="w-full bg-pink-600/10 text-pink-400 border border-pink-600/20 py-2 rounded-lg text-sm hover:bg-pink-600 hover:text-white transition mt-2"
+                      onClick={() => {
+                        if (deleteCourseId === selectedCourse.id) {
+                          handleDeleteCourse(selectedCourse.id);
+                        } else {
+                          setDeleteCourseId(selectedCourse.id);
+                          setDeleteCountdown(5);
+                        }
+                      }}
+                    >
+                      {deleteCourseId === selectedCourse.id ? (
+                        deleteCountdown > 0 ? `Wait ${deleteCountdown}s...` : "Confirm Delete Course"
+                      ) : (
+                        "Delete This Course"
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "question-management" && selectedQuiz && (
+            <div className="flex flex-col gap-8">
+              <div className="flex justify-between items-end">
+                <div>
+                  <button
+                    className="text-indigo-400 text-sm mb-2 hover:underline flex items-center gap-1"
+                    onClick={() => setActiveTab("course-detail")}
+                  >
+                    ← Back to Course
+                  </button>
+                  <h2 className="text-3xl font-bold">Manage Questions</h2>
+                  <p className="text-gray-400">{selectedQuiz.title} • {courseQuizzes.find(q => q.id === selectedQuiz.id)?.total_marks || 0} Total Marks</p>
+                </div>
+                <div className="flex gap-4 items-center">
+                  {/* Styled Bulk Type Selector */}
+                  <div className="btn-secondary flex items-center gap-2 px-4 py-3 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer relative">
+                    <span className="text-indigo-500 font-bold"><Database size={18} /></span>
+                    <select
+                      className="bg-transparent border-none text-sm font-bold cursor-pointer focus:ring-0 py-0 pr-8 -ml-1 text-slate-700 dark:text-slate-300"
+                      value={bulkType}
+                      onChange={(e) => setBulkType(e.target.value)}
+                    >
+                      <option value="mcq">Format: MCQ</option>
+                      <option value="true_false">Format: T/F</option>
+                      <option value="description">Format: Desc</option>
+                    </select>
+                  </div>
+                  <label className="btn-secondary flex items-center gap-2 px-6 py-3 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer">
+                    <FileText size={18} className="text-indigo-500" />
+                    TXT Upload
+                    <input type="file" className="hidden" accept=".txt" onChange={handleTxtBulkUpload} />
+                  </label>
+                  <label className="btn-secondary flex items-center gap-2 px-6 py-3 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer">
+                    <FileText size={18} className="text-indigo-500" />
+                    CSV Upload
+                    <input type="file" className="hidden" accept=".csv" onChange={handleCSVBulkUpload} />
+                  </label>
+                  <label className="btn-secondary flex items-center gap-2 px-6 py-3 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer">
+                    <Database size={18} className="text-indigo-500" />
+                    JSON Upload
+                    <input type="file" className="hidden" accept=".json" onChange={handleBulkUpload} />
+                  </label>
+                  <div className="flex gap-3">
+                    <a
+                      href={`http://127.0.0.1:8000/quizzes/${selectedQuiz.id}/export`}
+                      className="btn-secondary flex items-center gap-2 px-6 py-3 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                    >
+                      <TrendingUp size={18} className="text-indigo-500" />
+                      Export Stats
+                    </a>
+                    <a
+                      href="/demo_questions.txt"
+                      download="demo_questions.txt"
+                      className="bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-indigo-500 flex items-center justify-center p-3 rounded-xl transition-all border border-slate-200 dark:border-slate-700"
+                      title="Download Demo TXT Format"
+                    >
+                      <Download size={18} />
+                    </a>
+                  </div>
+                  <button className="btn-primary flex items-center gap-2 px-6 py-3 rounded-xl shadow-lg shadow-indigo-600/20" onClick={() => setShowAddQuestion(true)}>
+                    <Plus size={18} />
+                    Add Question
+                  </button>
+                </div>
+              </div>
+
+              <QuestionList
+                quizId={selectedQuiz.id}
+                refreshKey={refreshKey}
+                onEdit={(q) => {
+                  setEditingQuestion(q);
+                  setShowEditQuestion(true);
+                }}
+                onDelete={handleDeleteQuestion}
+              />
+            </div>
+          )}
+
+          {activeTab === "quiz-results" && (
+            <div className="flex flex-col gap-8">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/20">
+                <div>
+                  <h2 className="text-2xl font-black mb-1">Check Answer</h2>
+                  <p className="text-slate-500 text-sm">Select a course and quiz to review student performance</p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Course</label>
+                    <select
+                      className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl px-6 py-3 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700 dark:text-slate-200 min-w-[200px]"
+                      value={gradingCourse?.id || ""}
+                      onChange={async (e) => {
+                        const courseId = e.target.value;
+                        if (!courseId) {
+                          // All courses selected
+                          setGradingCourse(null);
+                          setGradingQuiz(null);
+                          // show all quizzes
+                          setGradingQuizzes(allQuizzes || []);
+                          return;
+                        }
+
+                        const course = myCourses.find(c => c.id === parseInt(courseId));
+                        setGradingCourse(course);
+                        setGradingQuiz(null);
+                        if (course) {
+                          try {
+                            const res = await fetch(`http://127.0.0.1:8000/courses/${course.id}/quizzes`);
+                            if (res.ok) setGradingQuizzes(await res.json());
+                            else setGradingQuizzes([]);
+                          } catch (err) {
+                            console.error("Failed to fetch quizzes", err);
+                            setGradingQuizzes([]);
+                          }
+                        } else {
+                          setGradingQuizzes([]);
+                        }
+                      }}
+                    >
+                      <option value="">All Courses</option>
+                      {myCourses.map(c => (
+                        <option key={c.id} value={c.id}>{c.title}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Quiz</label>
+                    <select
+                      className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl px-6 py-3 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700 dark:text-slate-200 min-w-[200px]"
+                      value={gradingQuiz?.id || ""}
+                      onChange={(e) => {
+                        const quizId = e.target.value;
+                        if (!quizId) {
+                          setGradingQuiz(null);
+                          return;
+                        }
+                        const source = (gradingQuizzes && gradingQuizzes.length > 0) ? gradingQuizzes : allQuizzes;
+                        const quiz = source.find(q => q.id === parseInt(quizId));
+                        setGradingQuiz(quiz);
+                      }}
+                    >
+                      <option value="">All Quizzes</option>
+                      {(gradingQuizzes && gradingQuizzes.length > 0 ? gradingQuizzes : allQuizzes).map(q => (
+                        <option key={q.id} value={q.id}>{q.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col gap-8">
+                {/* Show results for selected quiz, or for selected course, or all results by default */}
+                <div className="overflow-hidden bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 text-[10px] uppercase tracking-[0.2em] font-black">
+                        <th className="px-10 py-6 border-b border-slate-100 dark:border-slate-800">Student</th>
+                        <th className="px-10 py-6 text-center border-b border-slate-100 dark:border-slate-800">Score</th>
+                        <th className="px-10 py-6 text-center border-b border-slate-100 dark:border-slate-800">Violations</th>
+                        <th className="px-10 py-6 border-b border-slate-100 dark:border-slate-800">Status</th>
+                        <th className="px-10 py-6 text-right border-b border-slate-100 dark:border-slate-800">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {(
+                        allResults
+                          .filter(r => {
+                            if (gradingQuiz) return r.quiz_id === gradingQuiz.id;
+                            if (gradingCourse) return r.quiz && r.quiz.course && r.quiz.course.id === gradingCourse.id;
+                            return true; // no filter -> show all
+                          })
+                          .slice()
+                          .reverse()
+                      ).map((res) => {
+                        const isGraded = res.feedback && Object.keys(res.feedback).length > 0;
+                        return (
+                          <tr key={res.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all group">
+                            <td className="px-10 py-7">
+                              <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-indigo-500/10 text-indigo-400 rounded-full flex items-center justify-center font-black group-hover:scale-110 transition-transform">
+                                  {res.student?.full_name?.charAt(0) || "S"}
+                                </div>
+                                <div className="overflow-hidden">
+                                  <div className="font-bold text-slate-800 dark:text-slate-200 truncate text-lg">{res.student?.full_name}</div>
+                                  <div className="text-xs text-slate-500 truncate font-medium">{res.student?.email}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-10 py-7 text-center">
+                              <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-500/5 rounded-2xl">
+                                <span className="font-black text-2xl text-indigo-500">{res.score}</span>
+                                <span className="text-slate-400 text-xs font-bold">/ {res.total_marks}</span>
+                              </div>
+                            </td>
+                            <td className="px-10 py-7 text-center">
+                              <span className={`px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest ${res.eye_tracking_violations > 3 ? 'bg-red-500/10 text-red-500 shadow-lg shadow-red-500/10' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+                                {res.eye_tracking_violations}
+                              </span>
+                            </td>
+                            <td className="px-10 py-7">
+                              {isGraded ? (
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 bg-green-500 rounded-full shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
+                                  <span className="text-[10px] font-black text-green-500 uppercase tracking-widest">Graded</span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.6)]"></div>
+                                  <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Marking Needed</span>
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-10 py-7 text-right">
+                              <button
+                                className="btn-primary px-6 py-3 rounded-2xl text-sm font-black shadow-xl shadow-indigo-500/30 hover:shadow-indigo-500/40 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center gap-2 ml-auto"
+                                onClick={() => {
+                                  setSelectedAttempt(res);
+                                  setShowGradingModal(true);
+                                }}
+                              >
+                                Review & Mark
+                                <ArrowRight size={16} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {(
+                        gradingQuiz
+                          ? allResults.filter(r => r.quiz_id === gradingQuiz.id).length === 0
+                          : gradingCourse
+                            ? allResults.filter(r => r.quiz && r.quiz.course && r.quiz.course.id === gradingCourse.id).length === 0
+                            : allResults.length === 0
+                      ) && (
+                          <tr>
+                            <td colSpan="5" className="px-10 py-32 text-center text-slate-500">
+                              <div className="flex flex-col items-center gap-6 opacity-30">
+                                <Users size={80} className="text-slate-300 dark:text-slate-700" />
+                                <div className="text-2xl font-black">No student attempts yet</div>
+                                <p className="max-w-md text-sm font-medium leading-relaxed">Once students complete this quiz, their submissions will appear here automatically for your review.</p>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+          )}
+
+          {activeTab === "all-quizzes" && (
+            <div className="flex flex-col gap-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-3xl font-bold">All Quizzes</h2>
+                <div className="flex gap-2">
+                  <div>
+                    <select
+                      value={quizCourseFilter}
+                      onChange={(e) => setQuizCourseFilter(e.target.value)}
+                      className="bg-slate-800 border border-slate-700 pl-3 pr-3 py-2 rounded-xl text-sm outline-none mr-2"
+                    >
+                      <option value="all">All Courses</option>
+                      {myCourses.map(c => (
+                        <option key={c.id} value={c.id}>{c.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                    <input
+                      type="text"
+                      placeholder="Search quizzes..."
+                      className="bg-slate-800 border border-slate-700 pl-10 pr-4 py-2 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                      value={quizSearchQuery}
+                      onChange={(e) => setQuizSearchQuery(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                {allQuizzes
+                  .filter(q => (quizCourseFilter === 'all' || (q.course && q.course.id === Number(quizCourseFilter))))
+                  .filter(q =>
+                    q.title.toLowerCase().includes(quizSearchQuery.toLowerCase()) ||
+                    q.course?.title.toLowerCase().includes(quizSearchQuery.toLowerCase())
+                  )
+                  .map(quiz => (
                     <div key={quiz.id} className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl flex justify-between items-center group hover:border-indigo-500 transition shadow-sm dark:shadow-none">
                       <div className="flex gap-4 items-center">
                         <div className="p-3 bg-indigo-500/10 text-indigo-500 rounded-xl">
@@ -1025,9 +1647,9 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                         <div>
                           <h4 className="font-bold text-lg text-slate-900 dark:text-white">{quiz.title}</h4>
                           <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-gray-400 mt-1">
+                            <span className="flex items-center gap-1"><Layers size={12} /> {quiz.course?.title}</span>
                             <span className="flex items-center gap-1"><Clock size={12} /> {quiz.duration}m</span>
-                            <span className="flex items-center gap-1"><Key size={12} /> {quiz.access_key}</span>
-                            <span className={`px-2 py-0.5 rounded-full ${quiz.status === 'published' ? 'bg-green-500/10 text-green-600 dark:text-green-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-gray-300'}`}>
+                            <span className={`px-2 py-0.5 rounded-full ${quiz.status === 'published' ? 'bg-green-500/10 text-green-400' : 'bg-slate-700 text-gray-300'}`}>
                               {quiz.status}
                             </span>
                           </div>
@@ -1036,380 +1658,346 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                       <div className="flex gap-2">
                         <button
                           className="bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 border border-indigo-600/20 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-600 hover:text-white transition"
-                          onClick={() => { setSelectedQuiz(quiz); setActiveTab("question-management"); }}
+                          onClick={() => {
+                            setSelectedQuiz(quiz);
+                            setSelectedCourse(quiz.course);
+                            setActiveTab("question-management");
+                          }}
                         >
                           Questions
                         </button>
-                        <div className="flex gap-2">
-                          <button
-                            className="bg-slate-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 px-3 py-2 rounded-lg hover:bg-indigo-600 hover:text-white transition"
-                            onClick={() => {
-                              const start = new Date(quiz.start_time).toISOString().slice(0, 16);
-                              const end = new Date(quiz.end_time).toISOString().slice(0, 16);
-                              const deadline = quiz.deadline ? new Date(quiz.deadline).toISOString().slice(0, 16) : "";
-                              setEditingQuiz({ ...quiz, start_time: start, end_time: end, deadline: deadline });
-                              setShowEditQuiz(true);
-                            }}
-                            title="Edit Quiz"
-                          >
-                            <Pencil size={18} />
-                          </button>
-                          <button
-                            className="bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-red-500 rounded-lg px-3 py-2 transition"
-                            onClick={() => {
-                              if (window.confirm("Are you sure you want to delete this quiz? This will also remove all its questions and results.")) {
-                                handleDeleteQuiz(quiz.id);
-                              }
-                            }}
-                            title="Delete Quiz"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
+                        <button
+                          className="bg-slate-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 px-3 py-2 rounded-lg hover:bg-indigo-600 hover:text-white transition"
+                          onClick={() => {
+                            const start = new Date(quiz.start_time).toISOString().slice(0, 16);
+                            const end = new Date(quiz.end_time).toISOString().slice(0, 16);
+                            const deadline = quiz.deadline ? new Date(quiz.deadline).toISOString().slice(0, 16) : "";
+                            setEditingQuiz({ ...quiz, start_time: start, end_time: end, deadline: deadline });
+                            setShowEditQuiz(true);
+                          }}
+                        >
+                          <Pencil size={18} />
+                        </button>
+                        <button
+                          className="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-3 py-2 rounded-lg hover:bg-red-600 hover:text-white transition"
+                          onClick={() => {
+                            if (window.confirm("Are you sure you want to delete this quiz? This will also remove all its questions and results.")) {
+                              handleDeleteQuiz(quiz.id);
+                            }
+                          }}
+                          title="Delete Quiz"
+                        >
+                          <Trash2 size={18} />
+                        </button>
                       </div>
                     </div>
                   ))}
-                  {courseQuizzes.length === 0 && (
-                    <div className="bg-slate-50 dark:bg-slate-800/30 border-2 border-dashed border-slate-200 dark:border-slate-800 p-12 rounded-2xl flex flex-col items-center justify-center text-center">
-                      <FileText size={48} className="text-slate-300 dark:text-slate-700 mb-4" />
-                      <p className="text-slate-500 font-medium">No quizzes created yet for this course.</p>
-                      <button
-                        className="text-indigo-600 dark:text-indigo-400 hover:underline mt-2"
-                        onClick={() => setShowCreateQuiz(true)}
-                      >
-                        Create your first quiz
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-6">
-                <h3 className="text-xl font-bold flex items-center gap-2">
-                  <Shield size={20} className="text-indigo-400" />
-                  Course Settings
-                </h3>
-                <div className="chart-card flex flex-col gap-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Allow Self-Join</span>
-                    <input type="checkbox" checked={selectedCourse.self_join_enabled} readOnly className="w-4 h-4 rounded text-indigo-600" />
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Semester</span>
-                    <span className="text-sm text-gray-400">{selectedCourse.semester}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Batch</span>
-                    <span className="text-sm text-gray-400">{selectedCourse.batch}</span>
-                  </div>
-                  <div className="flex justify-between items-center group">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium">Course Access Key</span>
-                      <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Required for Student Enrollment</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <code className="bg-indigo-500/10 text-indigo-400 px-3 py-1 rounded-lg font-black tracking-widest border border-indigo-500/20">
-                        {selectedCourse.access_key || "NONE"}
-                      </code>
-                      <Key size={14} className="text-indigo-400 opacity-40" />
-                    </div>
-                  </div>
-                  <button className="w-full border border-slate-700 py-2 rounded-lg text-sm hover:bg-slate-800 transition mt-4" onClick={() => setShowEditCourse(true)}>
-                    Edit Course Details
-                  </button>
-                  <button
-                    className="w-full bg-pink-600/10 text-pink-400 border border-pink-600/20 py-2 rounded-lg text-sm hover:bg-pink-600 hover:text-white transition mt-2"
-                    onClick={() => {
-                      if (deleteCourseId === selectedCourse.id) {
-                        handleDeleteCourse(selectedCourse.id);
-                      } else {
-                        setDeleteCourseId(selectedCourse.id);
-                        setDeleteCountdown(5);
-                      }
-                    }}
-                  >
-                    {deleteCourseId === selectedCourse.id ? (
-                      deleteCountdown > 0 ? `Wait ${deleteCountdown}s...` : "Confirm Delete Course"
-                    ) : (
-                      "Delete This Course"
-                    )}
-                  </button>
-                </div>
+                {allQuizzes.length === 0 && (
+                  <div className="p-12 text-center text-gray-500">No quizzes found.</div>
+                )}
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {activeTab === "question-management" && selectedQuiz && (
-          <div className="flex flex-col gap-8">
-            <div className="flex justify-between items-end">
-              <div>
-                <button
-                  className="text-indigo-400 text-sm mb-2 hover:underline flex items-center gap-1"
-                  onClick={() => setActiveTab("course-detail")}
-                >
-                  ← Back to Course
-                </button>
-                <h2 className="text-3xl font-bold">Manage Questions</h2>
-                <p className="text-gray-400">{selectedQuiz.title} • {courseQuizzes.find(q => q.id === selectedQuiz.id)?.total_marks || 0} Total Marks</p>
-              </div>
-              <div className="flex gap-4">
-                <label className="btn-secondary flex items-center gap-2 px-6 py-3 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer">
-                  <FileText size={18} className="text-indigo-500" />
-                  TXT Upload
-                  <input type="file" className="hidden" accept=".txt" onChange={handleTxtBulkUpload} />
-                </label>
-                <label className="btn-secondary flex items-center gap-2 px-6 py-3 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer">
-                  <FileText size={18} className="text-indigo-500" />
-                  CSV Upload
-                  <input type="file" className="hidden" accept=".csv" onChange={handleCSVBulkUpload} />
-                </label>
-                <label className="btn-secondary flex items-center gap-2 px-6 py-3 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer">
-                  <Database size={18} className="text-indigo-500" />
-                  JSON Upload
-                  <input type="file" className="hidden" accept=".json" onChange={handleBulkUpload} />
-                </label>
-                <a
-                  href="/demo_questions.txt"
-                  download="demo_questions.txt"
-                  className="bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-indigo-500 flex items-center justify-center p-3 rounded-xl transition-all border border-slate-200 dark:border-slate-700"
-                  title="Download Demo TXT Format"
-                >
-                  <Download size={18} />
-                </a>
-                <button className="btn-primary flex items-center gap-2 px-6 py-3 rounded-xl shadow-lg shadow-indigo-600/20" onClick={() => setShowAddQuestion(true)}>
-                  <Plus size={18} />
-                  Add Question
-                </button>
-              </div>
-            </div>
-
-            <QuestionList
-              quizId={selectedQuiz.id}
-              refreshKey={refreshKey}
-              onEdit={(q) => {
-                setEditingQuestion(q);
-                setShowEditQuestion(true);
-              }}
-              onDelete={handleDeleteQuestion}
-            />
-          </div>
-        )}
-
-        {activeTab === "all-quizzes" && (
-          <div className="flex flex-col gap-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-3xl font-bold">All Quizzes</h2>
-              <div className="flex gap-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
-                  <input
-                    type="text"
-                    placeholder="Search quizzes..."
-                    className="bg-slate-800 border border-slate-700 pl-10 pr-4 py-2 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                    value={quizSearchQuery}
-                    onChange={(e) => setQuizSearchQuery(e.target.value)}
-                  />
+          {activeTab === "reports" && (
+            <div className="flex flex-col gap-6">
+              <div className="flex justify-between items-end">
+                <div>
+                  <h2 className="text-3xl font-bold">Student Reports</h2>
+                  <p className="text-slate-500 text-sm mt-1">Detailed breakdown of quiz performance and proctoring logs.</p>
                 </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 gap-4">
-              {allQuizzes.filter(q =>
-                q.title.toLowerCase().includes(quizSearchQuery.toLowerCase()) ||
-                q.course?.title.toLowerCase().includes(quizSearchQuery.toLowerCase())
-              ).map(quiz => (
-                <div key={quiz.id} className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl flex justify-between items-center group hover:border-indigo-500 transition shadow-sm dark:shadow-none">
-                  <div className="flex gap-4 items-center">
-                    <div className="p-3 bg-indigo-500/10 text-indigo-500 rounded-xl">
-                      <FileText size={20} />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-lg text-slate-900 dark:text-white">{quiz.title}</h4>
-                      <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-gray-400 mt-1">
-                        <span className="flex items-center gap-1"><Layers size={12} /> {quiz.course?.title}</span>
-                        <span className="flex items-center gap-1"><Clock size={12} /> {quiz.duration}m</span>
-                        <span className={`px-2 py-0.5 rounded-full ${quiz.status === 'published' ? 'bg-green-500/10 text-green-400' : 'bg-slate-700 text-gray-300'}`}>
-                          {quiz.status}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      className="bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 border border-indigo-600/20 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-600 hover:text-white transition"
-                      onClick={() => {
-                        setSelectedQuiz(quiz);
-                        setSelectedCourse(quiz.course);
-                        setActiveTab("question-management");
-                      }}
-                    >
-                      Questions
-                    </button>
-                    <button
-                      className="bg-slate-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 px-3 py-2 rounded-lg hover:bg-indigo-600 hover:text-white transition"
-                      onClick={() => {
-                        const start = new Date(quiz.start_time).toISOString().slice(0, 16);
-                        const end = new Date(quiz.end_time).toISOString().slice(0, 16);
-                        const deadline = quiz.deadline ? new Date(quiz.deadline).toISOString().slice(0, 16) : "";
-                        setEditingQuiz({ ...quiz, start_time: start, end_time: end, deadline: deadline });
-                        setShowEditQuiz(true);
-                      }}
-                    >
-                      <Pencil size={18} />
-                    </button>
-                    <button
-                      className="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-3 py-2 rounded-lg hover:bg-red-600 hover:text-white transition"
-                      onClick={() => {
-                        if (window.confirm("Are you sure you want to delete this quiz? This will also remove all its questions and results.")) {
-                          handleDeleteQuiz(quiz.id);
-                        }
-                      }}
-                      title="Delete Quiz"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-              {allQuizzes.length === 0 && (
-                <div className="p-12 text-center text-gray-500">No quizzes found.</div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {activeTab === "reports" && (
-          <div className="flex flex-col gap-6">
-            <div className="flex justify-between items-end">
-              <div>
-                <h2 className="text-3xl font-bold">Student Reports</h2>
-                <p className="text-slate-500 text-sm mt-1">Detailed breakdown of quiz performance and proctoring logs.</p>
-              </div>
-            </div>
-
-            {/* Analytics Summary */}
-            {allResults.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-indigo-600 p-6 rounded-3xl shadow-xl shadow-indigo-600/20 text-white">
-                  <p className="text-indigo-100 text-xs font-black uppercase tracking-widest mb-1">Average Score</p>
-                  <h3 className="text-3xl font-bold">
-                    {(allResults.reduce((acc, r) => acc + (r.score / r.total_marks), 0) / allResults.length * 100).toFixed(1)}%
-                  </h3>
-                </div>
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-800">
-                  <p className="text-slate-500 text-xs font-black uppercase tracking-widest mb-1">Total Pass</p>
-                  <h3 className="text-3xl font-bold text-green-500">
-                    {allResults.filter(r => (r.score / r.total_marks) >= 0.4).length}
-                  </h3>
-                </div>
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-800">
-                  <p className="text-slate-500 text-xs font-black uppercase tracking-widest mb-1">Total Fail</p>
-                  <h3 className="text-3xl font-bold text-red-500">
-                    {allResults.filter(r => (r.score / r.total_marks) < 0.4).length}
-                  </h3>
-                </div>
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                  <div>
-                    <p className="text-slate-500 text-xs font-black uppercase tracking-widest mb-1">Most Alerts</p>
-                    <h3 className="text-3xl font-bold text-amber-500">
-                      {Math.max(...allResults.map(r => r.eye_tracking_violations), 0)}
+              {/* Analytics Summary */}
+              {allResults.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="bg-indigo-600 p-6 rounded-3xl shadow-xl shadow-indigo-600/20 text-white">
+                    <p className="text-indigo-100 text-xs font-black uppercase tracking-widest mb-1">Average Score</p>
+                    <h3 className="text-3xl font-bold">
+                      {(allResults.reduce((acc, r) => acc + (r.score / r.total_marks), 0) / allResults.length * 100).toFixed(1)}%
                     </h3>
                   </div>
-                  <ShieldAlert className="text-amber-500/20" size={40} />
+                  <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-800">
+                    <p className="text-slate-500 text-xs font-black uppercase tracking-widest mb-1">Total Pass</p>
+                    <h3 className="text-3xl font-bold text-green-500">
+                      {allResults.filter(r => (r.score / r.total_marks) >= 0.4).length}
+                    </h3>
+                  </div>
+                  <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-800">
+                    <p className="text-slate-500 text-xs font-black uppercase tracking-widest mb-1">Total Fail</p>
+                    <h3 className="text-3xl font-bold text-red-500">
+                      {allResults.filter(r => (r.score / r.total_marks) < 0.4).length}
+                    </h3>
+                  </div>
+                  <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                    <div>
+                      <p className="text-slate-500 text-xs font-black uppercase tracking-widest mb-1">Most Alerts</p>
+                      <h3 className="text-3xl font-bold text-amber-500">
+                        {Math.max(...allResults.map(r => r.eye_tracking_violations), 0)}
+                      </h3>
+                    </div>
+                    <ShieldAlert className="text-amber-500/20" size={40} />
+                  </div>
                 </div>
-              </div>
-            )}
-            <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm dark:shadow-none">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="bg-slate-50 dark:bg-slate-800/80 text-slate-500 dark:text-gray-400 text-xs uppercase tracking-wider">
-                      <th className="p-4 font-bold">Student</th>
-                      <th className="p-4 font-bold">Course</th>
-                      <th className="p-4 font-bold">Quiz</th>
-                      <th className="p-4 font-bold text-center">Score</th>
-                      <th className="p-4 font-bold">Percentage</th>
-                      <th className="p-4 font-bold text-center">Violations</th>
-                      <th className="p-4 font-bold">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {allResults.map(result => (
-                      <React.Fragment key={result.id}>
-                        <tr className="border-t border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition group">
-                          <td className="p-4">
-                            <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-[10px] font-bold">
-                                {result.student?.full_name?.split(' ').map(n => n[0]).join('')}
-                              </div>
-                              <span className="text-sm font-medium text-slate-900 dark:text-white">{result.student?.full_name}</span>
-                            </div>
-                          </td>
-                          <td className="p-4 text-sm text-slate-700 dark:text-gray-300">{result.quiz?.course?.title}</td>
-                          <td className="p-4 text-sm text-slate-700 dark:text-gray-300">{result.quiz?.title}</td>
-                          <td className="p-4 font-mono text-sm text-center">
-                            <span className="text-slate-900 dark:text-white">{result.score}</span>
-                            <span className="text-gray-600"> / {result.total_marks}</span>
-                          </td>
-                          <td className="p-4 text-center">
-                            <span className={`px-2 py-1 rounded text-[10px] font-bold ${(result.score / result.total_marks) >= 0.8 ? 'bg-green-500/10 text-green-400' :
-                              (result.score / result.total_marks) >= 0.5 ? 'bg-amber-500/10 text-amber-400' :
-                                'bg-red-500/10 text-red-400'
-                              }`}>
-                              {((result.score / result.total_marks) * 100).toFixed(1)}%
-                            </span>
-                          </td>
-                          <td className="p-4 text-center">
-                            <button
-                              onClick={() => {
-                                if (result.eye_tracking_violations > 0) {
-                                  // Toggle expanded row logic
-                                  const key = `expanded_${result.id}`;
-                                  setExpandedResultId(expandedResultId === result.id ? null : result.id);
-                                }
-                              }}
-                              className={`px-3 py-1 rounded-full text-[10px] font-black transition-all ${result.eye_tracking_violations > 0
-                                ? 'bg-red-500/20 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white cursor-pointer'
-                                : 'bg-green-500/10 text-green-500'}`}
-                            >
-                              {result.eye_tracking_violations} Alerts
-                            </button>
-                          </td>
-                          <td className="p-4 text-xs text-gray-500">{new Date(result.completed_at).toLocaleDateString()}</td>
-                        </tr>
-                        {expandedResultId === result.id && result.timeline && (
-                          <tr className="bg-slate-50 dark:bg-slate-900/50">
-                            <td colSpan="7" className="p-4">
-                              <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-red-500/10 shadow-inner">
-                                <h5 className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-3 flex items-center gap-2">
-                                  <ShieldAlert size={12} /> Violation Timeline
-                                </h5>
-                                <div className="space-y-2">
-                                  {result.timeline.map((log, lidx) => (
-                                    <div key={lidx} className="flex justify-between items-center text-xs p-2 rounded-lg bg-slate-50 dark:bg-slate-900/30">
-                                      <span className="font-mono text-slate-400">{log.time}</span>
-                                      <span className="font-bold text-slate-700 dark:text-gray-300">{log.reason}</span>
-                                    </div>
-                                  ))}
+              )}
+              <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm dark:shadow-none">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-slate-800/80 text-slate-500 dark:text-gray-400 text-xs uppercase tracking-wider">
+                        <th className="p-4 font-bold">Student</th>
+                        <th className="p-4 font-bold">Course</th>
+                        <th className="p-4 font-bold">Quiz</th>
+                        <th className="p-4 font-bold text-center">Score</th>
+                        <th className="p-4 font-bold">Percentage</th>
+                        <th className="p-4 font-bold text-center">Violations</th>
+                        <th className="p-4 font-bold">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allResults.map(result => (
+                        <React.Fragment key={result.id}>
+                          <tr className="border-t border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition group">
+                            <td className="p-4">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-[10px] font-bold">
+                                  {result.student?.full_name?.split(' ').map(n => n[0]).join('')}
                                 </div>
+                                <span className="text-sm font-medium text-slate-900 dark:text-white">{result.student?.full_name}</span>
                               </div>
                             </td>
+                            <td className="p-4 text-sm text-slate-700 dark:text-gray-300">{result.quiz?.course?.title}</td>
+                            <td className="p-4 text-sm text-slate-700 dark:text-gray-300">{result.quiz?.title}</td>
+                            <td className="p-4 font-mono text-sm text-center">
+                              <span className="text-slate-900 dark:text-white">{result.score}</span>
+                              <span className="text-gray-600"> / {result.total_marks}</span>
+                            </td>
+                            <td className="p-4 text-center">
+                              <span className={`px-2 py-1 rounded text-[10px] font-bold ${(result.score / result.total_marks) >= 0.8 ? 'bg-green-500/10 text-green-400' :
+                                (result.score / result.total_marks) >= 0.5 ? 'bg-amber-500/10 text-amber-400' :
+                                  'bg-red-500/10 text-red-400'
+                                }`}>
+                                {((result.score / result.total_marks) * 100).toFixed(1)}%
+                              </span>
+                            </td>
+                            <td className="p-4 text-center">
+                              <button
+                                onClick={() => {
+                                  if (result.eye_tracking_violations > 0) {
+                                    // Toggle expanded row logic
+                                    const key = `expanded_${result.id}`;
+                                    setExpandedResultId(expandedResultId === result.id ? null : result.id);
+                                  }
+                                }}
+                                className={`px-3 py-1 rounded-full text-[10px] font-black transition-all ${result.eye_tracking_violations > 0
+                                  ? 'bg-red-500/20 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white cursor-pointer'
+                                  : 'bg-green-500/10 text-green-500'}`}
+                              >
+                                {result.eye_tracking_violations} Alerts
+                              </button>
+                            </td>
+                            <td className="p-4 text-xs text-gray-500">{new Date(result.completed_at).toLocaleDateString()}</td>
                           </tr>
-                        )}
-                      </React.Fragment>
-                    ))}
-                    {allResults.length === 0 && (
-                      <tr>
-                        <td colSpan="7" className="p-12 text-center text-gray-500">No results available yet.</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                          {expandedResultId === result.id && result.timeline && (
+                            <tr className="bg-slate-50 dark:bg-slate-900/50">
+                              <td colSpan="7" className="p-4">
+                                <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-red-500/10 shadow-inner">
+                                  <h5 className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-3 flex items-center gap-2">
+                                    <ShieldAlert size={12} /> Violation Timeline
+                                  </h5>
+                                  <div className="space-y-2">
+                                    {result.timeline.map((log, lidx) => (
+                                      <div key={lidx} className="flex justify-between items-center text-xs p-2 rounded-lg bg-slate-50 dark:bg-slate-900/30">
+                                        <span className="font-mono text-slate-400">{log.time}</span>
+                                        <span className="font-bold text-slate-700 dark:text-gray-300">{log.reason}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      ))}
+                      {allResults.length === 0 && (
+                        <tr>
+                          <td colSpan="7" className="p-12 text-center text-gray-500">No results available yet.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {activeTab === "students" && (
+            <div className="flex flex-col gap-6">
+              <div className="flex justify-between items-end">
+                <div>
+                  <h2 className="text-3xl font-bold">Enrolled Students</h2>
+                  <p className="text-slate-500 text-sm mt-1">Students enrolled in your courses.</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <label className="text-sm text-slate-600">Filter by Course:</label>
+                <select
+                  value={studentCourseFilter}
+                  onChange={(e) => setStudentCourseFilter(e.target.value)}
+                  className="bg-slate-800 border border-slate-700 pl-3 pr-3 py-2 rounded-xl text-sm outline-none"
+                >
+                  <option value="all">All Courses</option>
+                  {myCourses.map(c => (
+                    <option key={c.id} value={c.course_code}>{c.title} - {c.course_code}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm dark:shadow-none">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-slate-800/80 text-slate-500 dark:text-gray-400 text-xs uppercase tracking-wider">
+                        <th className="p-4 font-bold">Student Name</th>
+                        <th className="p-4 font-bold">Email</th>
+                        <th className="p-4 font-bold">Enrolled Course</th>
+                        <th className="p-4 font-bold">Code</th>
+                        <th className="p-4 font-bold">Joined At</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(
+                        studentCourseFilter === 'all'
+                          ? myStudents
+                          : myStudents.filter(s => s.course_code === studentCourseFilter)
+                      ).map((s, idx) => (
+                        <tr key={idx} className="border-t border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition">
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs font-bold">
+                                {s.full_name?.charAt(0)}
+                              </div>
+                              <span className="font-bold text-slate-900 dark:text-white">{s.full_name}</span>
+                            </div>
+                          </td>
+                          <td className="p-4 text-sm text-slate-500">{s.email}</td>
+                          <td className="p-4 text-sm font-medium">{s.course_title}</td>
+                          <td className="p-4 text-xs align-middle">
+                            <span className="font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded inline-block">{s.course_code}</span>
+                          </td>
+                          <td className="p-4 text-xs text-gray-500">{new Date(s.enrolled_at).toLocaleDateString()}</td>
+                        </tr>
+                      ))}
+                      {(
+                        studentCourseFilter === 'all'
+                          ? myStudents.length === 0
+                          : myStudents.filter(s => s.course_code === studentCourseFilter).length === 0
+                      ) && (
+                          <tr>
+                            <td colSpan="5" className="p-12 text-center text-gray-500">No students enrolled yet.</td>
+                          </tr>
+                        )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "profile" && (
+            <div className="max-w-2xl mx-auto w-full">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-3xl font-bold">Edit Profile</h2>
+                <button
+                  onClick={() => setActiveTab("dashboard")}
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition"
+                >
+                  <X size={24} className="text-slate-500" />
+                </button>
+              </div>
+              <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl">
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.target);
+                  const updates = Object.fromEntries(formData.entries());
+
+                  const cleanUpdates = {};
+                  for (const [key, value] of Object.entries(updates)) {
+                    if (value.trim() !== "") cleanUpdates[key] = value;
+                  }
+
+                  try {
+                    const token = localStorage.getItem("token");
+                    const res = await fetch("http://127.0.0.1:8000/auth/me", {
+                      method: "PUT",
+                      headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`
+                      },
+                      body: JSON.stringify(cleanUpdates)
+                    });
+                    if (res.ok) {
+                      alert("Profile updated successfully!");
+                    } else {
+                      const err = await res.json();
+                      alert("Update failed: " + (err.detail || "Unknown error"));
+                    }
+                  } catch (err) {
+                    alert("Network error");
+                  }
+                }} className="flex flex-col gap-6">
+
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="w-20 h-20 bg-indigo-600 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-lg shadow-indigo-600/20">
+                      {teacherData.full_name?.charAt(0)}
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold">{teacherData.full_name}</h3>
+                      <p className="text-slate-500 text-sm">{teacherData.email}</p>
+                      <span className="inline-block mt-1 px-2 py-0.5 bg-indigo-500/10 text-indigo-500 text-[10px] font-bold uppercase tracking-wider rounded">Teacher Account</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Full Name</label>
+                      <input name="full_name" defaultValue={teacherData.full_name} className="input-field w-full p-3 rounded-xl" placeholder="Your Name" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Email</label>
+                      <input name="email" defaultValue={teacherData.email} className="input-field w-full p-3 rounded-xl" placeholder="Email Address" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Degree</label>
+                      <input name="degree" defaultValue={teacherData.degree} className="input-field w-full p-3 rounded-xl" placeholder="e.g. PhD" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Department</label>
+                      <input name="department" defaultValue={teacherData.department} className="input-field w-full p-3 rounded-xl" placeholder="Department" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">University</label>
+                      <input name="university" defaultValue={teacherData.university} className="input-field w-full p-3 rounded-xl" placeholder="University Name" />
+                    </div>
+                  </div>
+
+                  <div className="border-t border-slate-200 dark:border-slate-700 pt-6 mt-2">
+                    <h4 className="font-bold text-slate-900 dark:text-white mb-4">Security</h4>
+                    <div>
+                      <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">New Password (Optional)</label>
+                      <input name="password" type="password" className="input-field w-full p-3 rounded-xl" placeholder="Leave empty to keep current" />
+                    </div>
+                  </div>
+
+                  <button type="submit" className="btn-primary py-4 rounded-xl font-bold shadow-lg shadow-indigo-600/20 mt-2">
+                    Save Changes
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
       </main>
 
       {/* Create Course Modal */}
@@ -1528,38 +2116,102 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
               </div>
 
               <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-black uppercase tracking-widest text-indigo-500 mb-2 block">Type</label>
+                    <select
+                      className="w-full input-field p-4 rounded-xl font-bold bg-slate-900 border-none text-white focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
+                      value={newQuestion.question_type || 'mcq'}
+                      onChange={(e) => {
+                        const type = e.target.value;
+                        let update = { ...newQuestion, question_type: type };
+                        if (type === 'true_false') {
+                          update.option_a = 'True';
+                          update.option_b = 'False';
+                          update.option_c = '';
+                          update.option_d = '';
+                          update.correct_option = 'a';
+                        } else if (type === 'description') {
+                          update.option_a = '';
+                          update.option_b = '';
+                          update.option_c = '';
+                          update.option_d = '';
+                          update.correct_option = '';
+                        }
+                        setNewQuestion(update);
+                      }}
+                    >
+                      <option value="mcq">Multiple Choice</option>
+                      <option value="true_false">True / False</option>
+                      <option value="description">Description (Text)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-black uppercase tracking-widest text-indigo-500 mb-2 block">Points</label>
+                    <input
+                      type="number"
+                      className="w-full input-field p-4 rounded-xl text-center font-black"
+                      value={newQuestion.point_value}
+                      onChange={(e) => setNewQuestion({ ...newQuestion, point_value: parseInt(e.target.value) || 0 })}
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label className="text-xs font-black uppercase tracking-widest text-indigo-500 mb-2 block">Question Text</label>
                   <textarea
                     placeholder="Enter the main question text here..."
-                    className="w-full input-field p-6 rounded-2xl h-40 resize-none font-medium text-lg leading-relaxed"
+                    className="w-full input-field p-6 rounded-2xl h-32 resize-none font-medium text-lg leading-relaxed"
                     value={newQuestion.text}
                     onChange={(e) => setNewQuestion({ ...newQuestion, text: e.target.value })}
                     required
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {['a', 'b', 'c', 'd'].map((label) => (
-                    <div key={label}>
-                      <label className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2 block">Option {label.toUpperCase()}</label>
-                      <input
-                        type="text"
-                        className="w-full input-field p-4 rounded-xl font-medium"
-                        value={newQuestion[`option_${label}`]}
-                        onChange={(e) => setNewQuestion({ ...newQuestion, [`option_${label}`]: e.target.value })}
-                        placeholder={`Choice ${label.toUpperCase()}`}
-                        required
-                      />
+                {(newQuestion.question_type === 'mcq' || !newQuestion.question_type) && (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {['a', 'b', 'c', 'd'].map((label) => (
+                        <div key={label}>
+                          <label className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2 block">Option {label.toUpperCase()}</label>
+                          <input
+                            type="text"
+                            className="w-full input-field p-4 rounded-xl font-medium"
+                            value={newQuestion[`option_${label}`]}
+                            onChange={(e) => setNewQuestion({ ...newQuestion, [`option_${label}`]: e.target.value })}
+                            placeholder={`Choice ${label.toUpperCase()}`}
+                            required
+                          />
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
 
-                <div className="flex flex-col md:flex-row gap-6 mt-4">
-                  <div className="flex-1">
+                    <div className="flex flex-col gap-2 mt-4">
+                      <label className="text-xs font-black uppercase tracking-widest text-indigo-500 mb-2 block">Correct Answer</label>
+                      <div className="grid grid-cols-4 gap-2 p-1.5 bg-slate-900/50 rounded-2xl border border-slate-800">
+                        {['a', 'b', 'c', 'd'].map(opt => (
+                          <button
+                            key={opt}
+                            type="button"
+                            className={`py-3 rounded-xl font-black transition-all ${newQuestion.correct_option === opt
+                              ? 'bg-indigo-600 text-white shadow-lg'
+                              : 'text-slate-500 hover:text-white hover:bg-slate-800'
+                              }`}
+                            onClick={() => setNewQuestion({ ...newQuestion, correct_option: opt })}
+                          >
+                            {opt.toUpperCase()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {newQuestion.question_type === 'true_false' && (
+                  <div className="flex flex-col gap-2 mt-4">
                     <label className="text-xs font-black uppercase tracking-widest text-indigo-500 mb-2 block">Correct Answer</label>
-                    <div className="grid grid-cols-4 gap-2 p-1.5 bg-slate-900/50 rounded-2xl border border-slate-800">
-                      {['a', 'b', 'c', 'd'].map(opt => (
+                    <div className="grid grid-cols-2 gap-4 p-1.5 bg-slate-900/50 rounded-2xl border border-slate-800">
+                      {['a', 'b'].map(opt => (
                         <button
                           key={opt}
                           type="button"
@@ -1569,21 +2221,19 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                             }`}
                           onClick={() => setNewQuestion({ ...newQuestion, correct_option: opt })}
                         >
-                          {opt.toUpperCase()}
+                          {opt === 'a' ? 'True' : 'False'}
                         </button>
                       ))}
                     </div>
                   </div>
-                  <div className="w-full md:w-32">
-                    <label className="text-xs font-black uppercase tracking-widest text-indigo-500 mb-2 block">Points</label>
-                    <input
-                      type="number"
-                      className="w-full input-field p-4 rounded-2xl text-center font-black"
-                      value={newQuestion.point_value}
-                      onChange={(e) => setNewQuestion({ ...newQuestion, point_value: parseInt(e.target.value) || 0 })}
-                    />
+                )}
+
+                {newQuestion.question_type === 'description' && (
+                  <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl mt-4">
+                    <p className="text-yellow-500 text-xs font-bold uppercase tracking-widest mb-1">Teacher Graded</p>
+                    <p className="text-gray-400 text-sm">Students will write a text response. You will grade this manually.</p>
                   </div>
-                </div>
+                )}
 
                 <div className="flex gap-4 pt-6">
                   <button type="button" className="flex-1 btn-secondary py-4 rounded-2xl font-bold" onClick={() => setShowAddQuestion(false)}>Cancel</button>
@@ -1606,7 +2256,7 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                     {newQuestion.text || "Type your question..."}
                   </p>
                   <div className="space-y-3">
-                    {['a', 'b', 'c', 'd'].map(label => (
+                    {(newQuestion.question_type === 'mcq' || !newQuestion.question_type) && ['a', 'b', 'c', 'd'].map(label => (
                       <div key={label} className={`p-4 rounded-xl border flex items-center gap-3 transition-all ${newQuestion.correct_option === label
                         ? 'border-green-500/50 bg-green-500/5'
                         : 'border-slate-700 opacity-40'}`}>
@@ -1620,6 +2270,28 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                         </span>
                       </div>
                     ))}
+
+                    {newQuestion.question_type === 'true_false' && ['a', 'b'].map(label => (
+                      <div key={label} className={`p-4 rounded-xl border flex items-center gap-3 transition-all ${newQuestion.correct_option === label
+                        ? 'border-green-500/50 bg-green-500/5'
+                        : 'border-slate-700 opacity-40'}`}>
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-black ${newQuestion.correct_option === label
+                          ? 'bg-green-500 text-white'
+                          : 'bg-slate-700 text-slate-500'}`}>
+                          {label === 'a' ? 'T' : 'F'}
+                        </div>
+                        <span className={`text-sm font-semibold ${newQuestion.correct_option === label ? 'text-green-400' : 'text-slate-500'}`}>
+                          {label === 'a' ? 'True' : 'False'}
+                        </span>
+                      </div>
+                    ))}
+
+                    {newQuestion.question_type === 'description' && (
+                      <div className="p-4 rounded-xl border border-slate-700 bg-slate-900/50">
+                        <p className="text-slate-500 text-sm italic">Student answer area...</p>
+                        <div className="h-20 border border-dashed border-slate-700 rounded-lg mt-2 opacity-50"></div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1629,6 +2301,337 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
       )}
 
       {/* Edit Question Modal */}
+      {/* Attempt Grading Modal */}
+      {showGradingModal && selectedAttempt && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-center justify-center p-4">
+          <div className="bg-slate-100 dark:bg-slate-900 w-full max-w-5xl max-h-[90vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300">
+            {/* Header */}
+            <div className="px-10 py-8 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-800/50">
+              <div className="flex items-center gap-5">
+                <div className="w-16 h-16 bg-indigo-500 text-white rounded-3xl flex items-center justify-center font-black text-2xl shadow-lg shadow-indigo-500/20">
+                  {selectedAttempt.student?.full_name?.charAt(0) || "S"}
+                </div>
+                <div>
+                  <h3 className="text-2xl font-black text-slate-900 dark:text-white">{selectedAttempt.student?.full_name}</h3>
+                  <p className="text-slate-500 font-medium">{selectedAttempt.student?.email}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">Total Score</div>
+                <div className="text-4xl font-black text-indigo-500">
+                  {(() => {
+                    // Dynamic Score Calculation
+                    const allQuestions = gradingModalQuestions.length > 0 ? gradingModalQuestions : (gradingQuizzes.find(q => q.id === selectedAttempt.quiz_id)?.questions || selectedAttempt.quiz?.questions || []);
+                    let currentScore = 0;
+
+                    allQuestions.forEach(q => {
+                      const qId = q.id.toString();
+                      const feedback = (selectedAttempt.feedback || {})[qId];
+
+                      // If marked manually, take that score
+                      if (feedback && typeof feedback.score === 'number') {
+                        currentScore += feedback.score;
+                      } else {
+                        // Auto-grading fallback
+                        const answer = (selectedAttempt.answers || {})[qId];
+                        const normalize = (val) => (val || "").toString().toLowerCase().trim();
+                        if (q.question_type !== 'description') {
+                          if (normalize(answer) === normalize(q.correct_option)) {
+                            currentScore += (q.point_value || 1);
+                          }
+                        }
+                      }
+                    });
+
+                    return currentScore;
+                  })()}<span className="text-slate-300 dark:text-slate-700 text-2xl font-medium"> / {selectedAttempt.total_marks}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-10 space-y-8 custom-scrollbar">
+              <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
+                <div className="flex items-center gap-3 text-indigo-400 font-bold mb-4 uppercase tracking-widest text-xs">
+                  <Shield size={16} /> Proctoring & Session Info
+                </div>
+                <div className="grid grid-cols-2 gap-8 text-center">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl">
+                    <span className="text-slate-500 text-xs font-bold uppercase block mb-1">Violations</span>
+                    <div className={`text-2xl font-black ${selectedAttempt.eye_tracking_violations > 3 ? 'text-red-500' : 'text-slate-700 dark:text-slate-200'}`}>
+                      {selectedAttempt.eye_tracking_violations}
+                    </div>
+                  </div>
+                  <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl">
+                    <span className="text-slate-500 text-xs font-bold uppercase block mb-1">Completed</span>
+                    <div className="text-lg font-bold text-slate-700 dark:text-slate-200">
+                      {new Date(selectedAttempt.completed_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500 mb-4 flex items-center gap-3">
+                <div className="w-8 h-[1px] bg-indigo-500/30"></div>
+                Review Answers
+              </h4>
+
+              {/* Tabs: MCQ / T-F / Description */}
+              {(() => {
+                const allQuestions = gradingModalQuestions.length > 0 ? gradingModalQuestions : (gradingQuizzes.find(q => q.id === selectedAttempt.quiz_id)?.questions || selectedAttempt.quiz?.questions || []);
+
+                // Map over QUESTIONS, not answers, to ensure we show every question even if skipped
+                const entries = allQuestions.map((q) => {
+                  const qId = q.id.toString();
+                  const answer = (selectedAttempt.answers || {})[qId];
+                  return {
+                    qId,
+                    answer,
+                    question: q,
+                    type: q.question_type || (q.question_type === "true_false" ? "true_false" : "mcq")
+                  };
+                });
+
+                const counts = {
+                  all: entries.length,
+                  mcq: entries.filter(e => (e.question.question_type || "mcq") === "mcq").length,
+                  true_false: entries.filter(e => (e.question.question_type || "") === "true_false").length,
+                  description: entries.filter(e => (e.question.question_type || "") === "description").length
+                };
+
+                const filtered = gradingAnswerTab === "all" ? entries : entries.filter(e => (e.question.question_type || "mcq") === gradingAnswerTab);
+
+                return (
+                  <div>
+                    <div className="flex gap-3 mb-6">
+                      {[
+                        { id: "all", label: `All (${counts.all})` },
+                        { id: "mcq", label: `MCQ (${counts.mcq})` },
+                        { id: "true_false", label: `T/F (${counts.true_false})` },
+                        { id: "description", label: `Desc (${counts.description})` }
+                      ].map(tab => (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => setGradingAnswerTab(tab.id)}
+                          className={`px-4 py-2 rounded-xl font-black text-xs uppercase tracking-wider ${gradingAnswerTab === tab.id ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-700'}`}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="space-y-6">
+                      {filtered.length === 0 && (
+                        <div className="py-12 text-center text-slate-500">No answers in this category.</div>
+                      )}
+                      {filtered.map((entry, idx) => {
+                        const qId = entry.qId;
+                        const answer = entry.answer;
+                        const question = entry.question;
+                        const feedback = (selectedAttempt.feedback || {})[qId] || {};
+                        const pointInfo = question.point_value || 1;
+
+                        const normalize = (val) => (val || "").toString().toLowerCase().trim();
+                        const isCorrect = normalize(answer) === normalize(question.correct_option);
+                        const isNotAnswered = !answer;
+
+                        return (
+                          <div key={qId} className="bg-white dark:bg-slate-800/40 rounded-[2rem] p-8 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-indigo-500/30 transition-all group">
+
+                            {/* Question Header */}
+                            <div className="flex justify-between items-start mb-6 gap-6">
+                              <div className="flex items-start gap-4 flex-1">
+                                <span className="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black group-hover:bg-indigo-600 transition-colors shadow-lg shadow-indigo-500/10 shrink-0">{idx + 1}</span>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-3 mb-2">
+                                    <span className="text-slate-400 text-[10px] uppercase font-bold tracking-widest">Question</span>
+                                    {question.question_type !== "description" && (
+                                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${isNotAnswered
+                                        ? "bg-slate-100 dark:bg-slate-700 text-slate-500"
+                                        : isCorrect
+                                          ? "bg-green-500/10 text-green-500"
+                                          : "bg-red-500/10 text-red-500"
+                                        }`}>
+                                        {isNotAnswered ? "Not Answered" : isCorrect ? `+${pointInfo} Points` : "Wrong"}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-slate-700 dark:text-slate-200 font-bold text-lg leading-tight">
+                                    {question.question_text || question.text || "Question content unavailable"}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Marks Input */}
+                              <div className="flex flex-col items-end shrink-0">
+                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Marks (Max: {pointInfo})</span>
+                                <input
+                                  type="number"
+                                  className="w-24 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-center font-black text-indigo-500 focus:ring-2 focus:ring-indigo-500 outline-none text-xl transition-all"
+                                  value={feedback.score ?? (isCorrect ? pointInfo : 0)}
+                                  max={pointInfo}
+                                  min={0}
+                                  onChange={(e) => {
+                                    let val = parseInt(e.target.value) || 0;
+                                    if (val > pointInfo) val = pointInfo; // Validation
+                                    if (val < 0) val = 0;
+
+                                    const currentFeed = { ...(selectedAttempt.feedback || {}) };
+                                    const qFeed = currentFeed[qId] || {};
+                                    currentFeed[qId] = { ...qFeed, score: val };
+                                    setSelectedAttempt({ ...selectedAttempt, feedback: currentFeed });
+                                  }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Options / Answer Section */}
+                            <div className="mb-6">
+                              <div className="text-indigo-400 text-[10px] uppercase font-black mb-4 flex items-center gap-2 tracking-widest">
+                                <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse"></div>
+                                Student Answer (Click Option to Edit)
+                              </div>
+
+                              {question.question_type === 'description' ? (
+                                <textarea
+                                  className="w-full bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 font-bold text-slate-700 dark:text-slate-200 leading-relaxed min-h-[100px] shadow-inner focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                                  value={answer || ""}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    const currentAnswers = { ...(selectedAttempt.answers || {}) };
+                                    currentAnswers[qId] = val;
+                                    setSelectedAttempt({ ...selectedAttempt, answers: currentAnswers });
+                                  }}
+                                />
+                              ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  {['a', 'b', 'c', 'd'].map((opt) => {
+                                    if (question.question_type === "true_false" && (opt === "c" || opt === "d")) return null;
+                                    const optText = question[`option_${opt}`];
+                                    const isStudentSelected = normalize(answer) === normalize(opt);
+                                    const isCorrectOpt = normalize(question.correct_option) === normalize(opt);
+
+                                    // Styling Logic (Same as Student View)
+                                    let cardClass = "bg-transparent border-slate-100 dark:border-slate-700 text-slate-500 opacity-60 hover:bg-slate-50 cursor-pointer";
+                                    let iconClass = "bg-slate-100 dark:bg-slate-700";
+
+                                    if (!isNotAnswered) {
+                                      if (isCorrectOpt) {
+                                        cardClass = "bg-green-500/10 border-green-500 text-green-700 dark:text-green-400 cursor-pointer";
+                                        iconClass = "bg-green-500 text-white";
+                                      } else if (isStudentSelected) {
+                                        cardClass = "bg-red-500/10 border-red-500 text-red-700 dark:text-red-400 cursor-pointer";
+                                        iconClass = "bg-red-500 text-white";
+                                      }
+                                    } else {
+                                      // Allow selection even if not answered
+                                      cardClass = "bg-transparent border-slate-100 dark:border-slate-700 text-slate-500 hover:border-indigo-300 cursor-pointer";
+                                    }
+
+                                    return (
+                                      <div
+                                        key={opt}
+                                        onClick={() => {
+                                          // Update Answer Logic
+                                          const currentAnswers = { ...(selectedAttempt.answers || {}) };
+                                          currentAnswers[qId] = opt;
+                                          setSelectedAttempt({ ...selectedAttempt, answers: currentAnswers });
+                                        }}
+                                        className={`p-4 rounded-2xl border-2 flex items-center gap-4 transition-all ${cardClass}`}
+                                      >
+                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black uppercase ${iconClass}`}>
+                                          {opt}
+                                        </div>
+                                        <div className="flex flex-col">
+                                          <span className="font-bold">{optText}</span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Marking Notes */}
+                            <div>
+                              <div className="text-slate-400 text-[10px] uppercase font-black mb-2 flex items-center gap-2 tracking-widest">
+                                <Database size={12} /> Marking Notes / Feedback
+                              </div>
+                              <textarea
+                                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none min-h-[100px] transition-all"
+                                placeholder="Your comments for the student..."
+                                value={feedback.comment || ""}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  const currentFeed = { ...(selectedAttempt.feedback || {}) };
+                                  const qFeed = currentFeed[qId] || {};
+                                  currentFeed[qId] = { ...qFeed, comment: val };
+                                  setSelectedAttempt({ ...selectedAttempt, feedback: currentFeed });
+                                }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Footer */}
+            <div className="px-10 py-8 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-6 bg-white dark:bg-slate-800/50">
+              <button
+                className="px-8 py-3 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all"
+                onClick={() => {
+                  setShowGradingModal(false);
+                  setSelectedAttempt(null);
+                }}
+              >
+                Discard Changes
+              </button>
+              <button
+                className="btn-primary px-12 py-3 rounded-2xl font-black shadow-2xl shadow-indigo-500/20 flex items-center gap-3 transform hover:scale-105 active:scale-95 transition-all text-sm uppercase tracking-widest"
+                disabled={isGrading}
+                onClick={async () => {
+                  setIsGrading(true);
+                  try {
+                    const token = localStorage.getItem("token");
+                    const res = await fetch(`http://127.0.0.1:8000/results/${selectedAttempt.id}/grade`, {
+                      method: "PUT",
+                      headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`
+                      },
+                      body: JSON.stringify({
+                        feedback: selectedAttempt.feedback || {},
+                        answers: selectedAttempt.answers || {}
+                      })
+                    });
+
+                    if (res.ok) {
+                      alert("GRADING SUCCESS: Data synced to student portal.");
+                      setShowGradingModal(false);
+                      setSelectedAttempt(null);
+                      fetchAllResults(); // Refresh list
+                    } else {
+                      alert("GRADNG ERROR: Server rejected the payload.");
+                    }
+                  } catch (err) {
+                    alert("NETWORK ERROR: Connection failed.");
+                  } finally {
+                    setIsGrading(false);
+                  }
+                }}
+              >
+                {isGrading ? "Processing..." : "Submit Marking"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showEditQuestion && editingQuestion && (
         <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[200] p-4 overflow-y-auto">
           <div className="modal-content p-8 rounded-2xl w-full max-w-6xl shadow-2xl my-8 relative flex flex-col lg:flex-row gap-12">
@@ -1808,6 +2811,7 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                 />
               </div>
 
+
               <div className="md:col-span-2">
                 <label className="text-sm text-gray-400 mb-1 block">Description</label>
                 <textarea
@@ -1868,32 +2872,31 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                 />
               </div>
 
+
               <div>
-                <label className="text-sm text-gray-400 mb-1 block">Question Limit (0=All)</label>
+                <label className="text-sm text-gray-400 mb-1 block">Violation Limit</label>
                 <input
                   type="number"
                   className="w-full input-field p-3 rounded-xl"
-                  value={editingQuiz.max_questions || 0}
-                  onChange={(e) => setEditingQuiz({ ...editingQuiz, max_questions: parseInt(e.target.value) || 0 })}
+                  value={editingQuiz.violation_limit || 5}
+                  onChange={(e) => setEditingQuiz({ ...editingQuiz, violation_limit: parseInt(e.target.value) || 5 })}
                 />
               </div>
 
               <div className="md:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
                 <div className="flex flex-col gap-2">
-                  <label className="text-xs text-gray-500 font-bold">Shuffle Qs</label>
+                  <label className="text-xs text-gray-500 font-bold">Eye Tracking</label>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" className="sr-only peer" checked={editingQuiz.eye_tracking_enabled} onChange={(e) => setEditingQuiz({ ...editingQuiz, eye_tracking_enabled: e.target.checked })} />
+                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-600"></div>
+                  </label>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs text-gray-500 font-bold">Shuffle Questions</label>
                   <input
                     type="checkbox"
                     checked={editingQuiz.shuffle_questions}
                     onChange={(e) => setEditingQuiz({ ...editingQuiz, shuffle_questions: e.target.checked })}
-                    className="w-4 h-4 rounded text-indigo-600"
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs text-gray-500 font-bold">Shuffle Opts</label>
-                  <input
-                    type="checkbox"
-                    checked={editingQuiz.shuffle_options}
-                    onChange={(e) => setEditingQuiz({ ...editingQuiz, shuffle_options: e.target.checked })}
                     className="w-4 h-4 rounded text-indigo-600"
                   />
                 </div>
@@ -1934,161 +2937,162 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
               </div>
             </form>
           </div>
-        </div>
-      )}
+        </div >
+      )
+      }
       {/* Create Quiz Modal */}
-      {showCreateQuiz && (
-        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[200] p-4 overflow-y-auto">
-          <div className="modal-content p-8 rounded-2xl w-full max-w-2xl shadow-2xl my-8">
-            <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-              <PlusCircle className="text-indigo-500" />
-              Configure New Quiz
-            </h2>
-            <form onSubmit={handleCreateQuiz} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="md:col-span-2">
-                <label className="text-sm text-gray-400 mb-1 block">Quiz Title</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Midterm Examination"
-                  className="w-full input-field p-3 rounded-xl"
-                  value={newQuiz.title}
-                  onChange={(e) => setNewQuiz({ ...newQuiz, title: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="text-sm text-gray-400 mb-1 block">Description</label>
-                <textarea
-                  placeholder="Instructions for students..."
-                  className="w-full input-field p-3 rounded-xl h-20"
-                  value={newQuiz.description}
-                  onChange={(e) => setNewQuiz({ ...newQuiz, description: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-sm text-gray-400 mb-1 block flex items-center gap-1">
-                  <Calendar size={14} /> Start Time
-                </label>
-                <input
-                  type="datetime-local"
-                  className="w-full input-field p-3 rounded-xl"
-                  value={newQuiz.start_time}
-                  onChange={(e) => setNewQuiz({ ...newQuiz, start_time: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-sm text-gray-400 mb-1 block flex items-center gap-1">
-                  <Clock size={14} /> End Time
-                </label>
-                <input
-                  type="datetime-local"
-                  className="w-full input-field p-3 rounded-xl"
-                  value={newQuiz.end_time}
-                  onChange={(e) => setNewQuiz({ ...newQuiz, end_time: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-sm text-gray-400 mb-1 block">Duration (Minutes)</label>
-                <input
-                  type="number"
-                  className="w-full input-field p-3 rounded-xl"
-                  value={newQuiz.duration}
-                  onChange={(e) => setNewQuiz({ ...newQuiz, duration: parseInt(e.target.value) || 0 })}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-sm text-gray-400 mb-1 block">Question Limit (0=All)</label>
-                <input
-                  type="number"
-                  placeholder="0 to show all questions"
-                  className="w-full input-field p-3 rounded-xl"
-                  value={newQuiz.max_questions || 0}
-                  onChange={(e) => setNewQuiz({ ...newQuiz, max_questions: parseInt(e.target.value) || 0 })}
-                />
-              </div>
-
-              <div>
-                <label className="text-sm text-gray-400 mb-1 block flex items-center gap-1">
-                  <Key size={14} /> Access Key
-                </label>
-                <input
-                  type="text"
-                  placeholder="QUIZ123"
-                  className="w-full input-field p-3 rounded-xl"
-                  value={newQuiz.access_key}
-                  onChange={(e) => setNewQuiz({ ...newQuiz, access_key: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="md:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs text-gray-500 font-bold">Shuffle Questions</label>
+      {
+        showCreateQuiz && (
+          <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[200] p-4 overflow-y-auto">
+            <div className="modal-content p-8 rounded-2xl w-full max-w-2xl shadow-2xl my-8">
+              <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+                <PlusCircle className="text-indigo-500" />
+                Configure New Quiz
+              </h2>
+              <form onSubmit={handleCreateQuiz} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2">
+                  <label className="text-sm text-gray-400 mb-1 block">Quiz Title</label>
                   <input
-                    type="checkbox"
-                    checked={newQuiz.shuffle_questions}
-                    onChange={(e) => setNewQuiz({ ...newQuiz, shuffle_questions: e.target.checked })}
-                    className="w-4 h-4 rounded text-indigo-600"
+                    type="text"
+                    placeholder="e.g. Midterm Examination"
+                    className="w-full input-field p-3 rounded-xl"
+                    value={newQuiz.title}
+                    onChange={(e) => setNewQuiz({ ...newQuiz, title: e.target.value })}
+                    required
                   />
                 </div>
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs text-gray-500 font-bold">Shuffle Options</label>
-                  <input
-                    type="checkbox"
-                    checked={newQuiz.shuffle_options}
-                    onChange={(e) => setNewQuiz({ ...newQuiz, shuffle_options: e.target.checked })}
-                    className="w-4 h-4 rounded text-indigo-600"
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs text-gray-500 font-bold">Fullscreen Req.</label>
-                  <input
-                    type="checkbox"
-                    checked={newQuiz.fullscreen_required}
-                    onChange={(e) => setNewQuiz({ ...newQuiz, fullscreen_required: e.target.checked })}
-                    className="w-4 h-4 rounded text-indigo-600"
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs text-gray-500 font-bold">Tab Security</label>
-                  <input
-                    type="checkbox"
-                    checked={newQuiz.tab_switch_detection}
-                    onChange={(e) => setNewQuiz({ ...newQuiz, tab_switch_detection: e.target.checked })}
-                    className="w-4 h-4 rounded text-indigo-600"
-                  />
-                </div>
-              </div>
 
-              <div className="md:col-span-2 flex gap-4 mt-8">
-                <button
-                  type="button"
-                  className="flex-1 btn-secondary py-4 rounded-2xl font-bold"
-                  onClick={() => setShowCreateQuiz(false)}
-                >
-                  DISCARD
-                </button>
-                <button
-                  type="submit"
-                  className="flex-3 btn-primary py-4 rounded-2xl font-bold shadow-lg shadow-indigo-600/20"
-                >
-                  CREATE QUIZ
-                </button>
-              </div>
-            </form>
+                <div className="md:col-span-2">
+                  <label className="text-sm text-gray-400 mb-1 block">Description</label>
+                  <textarea
+                    placeholder="Instructions for students..."
+                    className="w-full input-field p-3 rounded-xl h-20"
+                    value={newQuiz.description}
+                    onChange={(e) => setNewQuiz({ ...newQuiz, description: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm text-gray-400 mb-1 block flex items-center gap-1">
+                    <Calendar size={14} /> Start Time
+                  </label>
+                  <input
+                    type="datetime-local"
+                    className="w-full input-field p-3 rounded-xl"
+                    value={newQuiz.start_time}
+                    onChange={(e) => setNewQuiz({ ...newQuiz, start_time: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm text-gray-400 mb-1 block flex items-center gap-1">
+                    <Clock size={14} /> End Time
+                  </label>
+                  <input
+                    type="datetime-local"
+                    className="w-full input-field p-3 rounded-xl"
+                    value={newQuiz.end_time}
+                    onChange={(e) => setNewQuiz({ ...newQuiz, end_time: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm text-gray-400 mb-1 block">Duration (Minutes)</label>
+                  <input
+                    type="number"
+                    className="w-full input-field p-3 rounded-xl"
+                    value={newQuiz.duration}
+                    onChange={(e) => setNewQuiz({ ...newQuiz, duration: parseInt(e.target.value) || 0 })}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm text-gray-400 mb-1 block">Violation Limit</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 5"
+                    className="w-full input-field p-3 rounded-xl"
+                    value={newQuiz.violation_limit || 5}
+                    onChange={(e) => setNewQuiz({ ...newQuiz, violation_limit: parseInt(e.target.value) || 5 })}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm text-gray-400 mb-1 block flex items-center gap-1">
+                    <Key size={14} /> Access Key
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="QUIZ123"
+                    className="w-full input-field p-3 rounded-xl"
+                    value={newQuiz.access_key}
+                    onChange={(e) => setNewQuiz({ ...newQuiz, access_key: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="md:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs text-gray-500 font-bold">Eye Tracking</label>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" className="sr-only peer" checked={newQuiz.eye_tracking_enabled} onChange={(e) => setNewQuiz({ ...newQuiz, eye_tracking_enabled: e.target.checked })} />
+                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-600"></div>
+                    </label>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs text-gray-500 font-bold">Shuffle Questions</label>
+                    <input
+                      type="checkbox"
+                      checked={newQuiz.shuffle_questions}
+                      onChange={(e) => setNewQuiz({ ...newQuiz, shuffle_questions: e.target.checked })}
+                      className="w-4 h-4 rounded text-indigo-600"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs text-gray-500 font-bold">Fullscreen Req.</label>
+                    <input
+                      type="checkbox"
+                      checked={newQuiz.fullscreen_required}
+                      onChange={(e) => setNewQuiz({ ...newQuiz, fullscreen_required: e.target.checked })}
+                      className="w-4 h-4 rounded text-indigo-600"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs text-gray-500 font-bold">Tab Security</label>
+                    <input
+                      type="checkbox"
+                      checked={newQuiz.tab_switch_detection}
+                      onChange={(e) => setNewQuiz({ ...newQuiz, tab_switch_detection: e.target.checked })}
+                      className="w-4 h-4 rounded text-indigo-600"
+                    />
+                  </div>
+                </div>
+
+                <div className="md:col-span-2 flex gap-4 mt-8">
+                  <button
+                    type="button"
+                    className="flex-1 btn-secondary py-4 rounded-2xl font-bold"
+                    onClick={() => setShowCreateQuiz(false)}
+                  >
+                    DISCARD
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-3 btn-primary py-4 rounded-2xl font-bold shadow-lg shadow-indigo-600/20"
+                  >
+                    CREATE QUIZ
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   );
 }
 
@@ -2117,6 +3121,7 @@ function StatCard({ title, value, trend, icon }) {
 function QuestionList({ quizId, refreshKey, onEdit, onDelete }) {
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filterTab, setFilterTab] = useState("all");
 
   useEffect(() => {
     const fetchQuestions = async () => {
@@ -2138,9 +3143,30 @@ function QuestionList({ quizId, refreshKey, onEdit, onDelete }) {
 
   if (loading) return <div className="text-gray-500 italic p-8 text-center bg-slate-800/20 rounded-2xl border border-slate-800">Loading questions...</div>;
 
+  const filteredQuestions = questions.filter(q => {
+    if (filterTab === "all") return true;
+    return (q.question_type || "mcq") === filterTab;
+  });
+
   return (
     <div className="flex flex-col gap-6">
-      {questions.map((q, index) => (
+      {/* Question Type Tabs */}
+      <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800/50 rounded-xl w-fit">
+        {[{ id: 'all', label: 'All Questions' }, { id: 'mcq', label: 'MCQ' }, { id: 'true_false', label: 'True / False' }, { id: 'description', label: 'Description' }].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setFilterTab(tab.id)}
+            className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${filterTab === tab.id
+              ? 'bg-white dark:bg-slate-800 text-indigo-500 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+              }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {filteredQuestions.map((q, index) => (
         <div key={q.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 rounded-3xl shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
           {/* Points Badge */}
           <div className="absolute top-0 right-0 bg-indigo-600 text-white px-4 py-1 rounded-bl-2xl text-[10px] font-bold uppercase tracking-widest shadow-sm">
@@ -2177,7 +3203,7 @@ function QuestionList({ quizId, refreshKey, onEdit, onDelete }) {
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {['a', 'b', 'c', 'd'].map(label => {
+                {(q.question_type === 'true_false' ? ['a', 'b'] : (q.question_type === 'description' ? [] : ['a', 'b', 'c', 'd'])).map(label => {
                   const optKey = `option_${label}`;
                   const isCorrect = q.correct_option === label;
                   return (
@@ -2204,6 +3230,12 @@ function QuestionList({ quizId, refreshKey, onEdit, onDelete }) {
                   );
                 })}
               </div>
+              {q.question_type === 'description' && (
+                <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl">
+                  <p className="text-xs font-bold uppercase text-slate-400 mb-1">Description Question</p>
+                  <p className="text-sm text-slate-600 dark:text-gray-400 italic">No predefined options for this type.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

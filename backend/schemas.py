@@ -18,6 +18,16 @@ class UserCreate(UserBase):
 class UserLogin(UserBase):
     password: str
 
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    mobile: Optional[str] = None
+    password: Optional[str] = None
+    degree: Optional[str] = None
+    department: Optional[str] = None
+    university: Optional[str] = None
+    student_id: Optional[str] = None
+
 class UserResponse(UserBase):
     id: int
     full_name: str
@@ -76,10 +86,12 @@ class QuizBase(BaseModel):
     total_marks: int
     access_key: str
     attempts_count: int = 1
-    shuffle_questions: bool = True
-    shuffle_options: bool = True
+    max_questions: int = 0
+    shuffle_questions: bool = False
+    eye_tracking_enabled: bool = False
     fullscreen_required: bool = False
     tab_switch_detection: bool = False
+    violation_limit: int = 5
     status: str = "draft"
 
 class QuizCreate(QuizBase):
@@ -96,12 +108,13 @@ class QuizResponse(QuizBase):
 # --- Question Schemas ---
 class QuestionBase(BaseModel):
     text: str
-    option_a: str
-    option_b: str
-    option_c: str
-    option_d: str
-    correct_option: str
+    option_a: Optional[str] = None
+    option_b: Optional[str] = None
+    option_c: Optional[str] = None
+    option_d: Optional[str] = None
+    correct_option: Optional[str] = None
     point_value: int = 1
+    question_type: str = "mcq" # mcq, true_false, description
 
 class QuestionCreate(QuestionBase):
     quiz_id: Optional[int] = None
@@ -120,15 +133,18 @@ class ResultCreate(BaseModel):
     total_marks: int
     eye_tracking_violations: int = 0
     timeline: Optional[List[dict]] = None
+    answers: Optional[dict] = None
 
 class ResultResponse(BaseModel):
     id: int
     student_id: int
-    quiz_id: int
+    quiz_id: Optional[int] = None
     score: int
     total_marks: int
     eye_tracking_violations: int
     timeline: Optional[List[dict]] = None
+    answers: Optional[dict] = None
+    feedback: Optional[dict] = None
     completed_at: datetime
     student: Optional[UserResponse] = None
     quiz: Optional[QuizResponse] = None
