@@ -176,6 +176,7 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
   const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [passNew, setPassNew] = useState("");
   const [passConfirm, setPassConfirm] = useState("");
+  const [previousTab, setPreviousTab] = useState("dashboard");
 
   useEffect(() => {
     // Fetch data from backend
@@ -426,7 +427,11 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
               icon={<User size={18} />}
               label="Profile"
               active={activeTab === "profile"}
-              onClick={() => { setActiveTab("profile"); setIsSidebarOpen(false); }}
+              onClick={() => {
+                if (activeTab !== "profile") setPreviousTab(activeTab);
+                setActiveTab("profile");
+                setIsSidebarOpen(false);
+              }}
             />
             <SidebarItem
               icon={<LogOut size={18} />}
@@ -897,7 +902,7 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
               <div className="max-w-2xl mx-auto w-full">
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-3xl font-bold">Edit Profile</h2>
-                  <button onClick={() => setActiveTab("dashboard")} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition">
+                  <button onClick={() => setActiveTab(previousTab)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition">
                     <X size={24} className="text-slate-500" />
                   </button>
                 </div>

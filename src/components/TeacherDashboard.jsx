@@ -226,6 +226,7 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
   const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [passNew, setPassNew] = useState("");
   const [passConfirm, setPassConfirm] = useState("");
+  const [previousTab, setPreviousTab] = useState("dashboard");
 
   useEffect(() => {
     localStorage.setItem("teacher_selectedCourse", JSON.stringify(selectedCourse));
@@ -1092,7 +1093,11 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
             icon={<User size={18} />}
             label="Profile"
             active={activeTab === "profile"}
-            onClick={() => { setActiveTab("profile"); setIsSidebarOpen(false); }}
+            onClick={() => {
+              if (activeTab !== "profile") setPreviousTab(activeTab);
+              setActiveTab("profile");
+              setIsSidebarOpen(false);
+            }}
           />
           <SidebarItem icon={<LogOut size={18} />} label="Logout" onClick={handleLogout} />
         </div>
@@ -2065,7 +2070,7 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-3xl font-bold">Edit Profile</h2>
                 <button
-                  onClick={() => setActiveTab("dashboard")}
+                  onClick={() => setActiveTab(previousTab)}
                   className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition"
                 >
                   <X size={24} className="text-slate-500" />
