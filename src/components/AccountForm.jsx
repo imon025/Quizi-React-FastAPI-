@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 
 const AccountForm = ({ setShowAccount, onLogin }) => {
   const [isLogin, setIsLogin] = useState(true);
@@ -9,6 +10,7 @@ const AccountForm = ({ setShowAccount, onLogin }) => {
   const [email, setEmail] = useState("");
   const [mobile, setMobile] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   // Student-specific
   const [studentId, setStudentId] = useState("");
@@ -140,14 +142,23 @@ const AccountForm = ({ setShowAccount, onLogin }) => {
                 onChange={(e) => setEmail(e.target.value)}
                 required
               />
-              <input
-                type="password"
-                placeholder="Password *"
-                className={mandatoryInput}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Password *"
+                  className={mandatoryInput}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </>
           ) : (
             <>
@@ -201,14 +212,23 @@ const AccountForm = ({ setShowAccount, onLogin }) => {
                   onChange={(e) => setMobile(e.target.value)}
                   required
                 />
-                <input
-                  type="password"
-                  placeholder="Password *"
-                  className={mandatoryInput}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Password *"
+                    className={mandatoryInput}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
 
               {/* Student ID / Degree */}

@@ -95,6 +95,18 @@ def login(user_credentials: schemas.UserLogin, db: Session = Depends(get_db)):
 def get_me(current_user: models.User = Depends(get_current_user)):
     return current_user
 
+@app.post("/auth/change-password")
+def change_password(request: schemas.PasswordChangeRequest, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not auth.verify_password(request.old_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Incorrect old password")
+    
+    if request.new_password != request.confirm_new_password:
+        raise HTTPException(status_code=400, detail="New passwords do not match")
+    
+    current_user.hashed_password = auth.get_password_hash(request.new_password)
+    db.commit()
+    return {"message": "Password updated successfully"}
+
 @app.put("/auth/me", response_model=schemas.UserResponse)
 def update_me(user_update: schemas.UserUpdate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     # If email is being updated, check if it's already taken

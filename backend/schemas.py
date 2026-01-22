@@ -27,6 +27,10 @@ class UserUpdate(BaseModel):
     department: Optional[str] = None
     university: Optional[str] = None
     student_id: Optional[str] = None
+class PasswordChangeRequest(BaseModel):
+    old_password: str
+    new_password: str
+    confirm_new_password: str
 
 class UserResponse(UserBase):
     id: int

@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   Eye,
+  EyeOff,
   Sun,
   Moon,
   Calendar,
@@ -219,6 +220,9 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const [bulkType, setBulkType] = useState(localStorage.getItem("teacher_bulkType") || 'mcq');
+  const [showOldPass, setShowOldPass] = useState(false);
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
 
   useEffect(() => {
     localStorage.setItem("teacher_selectedCourse", JSON.stringify(selectedCourse));
@@ -2091,1140 +2095,1248 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Full Name</label>
-                      <input name="full_name" defaultValue={teacherData.full_name} className="input-field w-full p-3 rounded-xl" placeholder="Your Name" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Email</label>
-                      <input name="email" defaultValue={teacherData.email} className="input-field w-full p-3 rounded-xl" placeholder="Email Address" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Degree</label>
-                      <input name="degree" defaultValue={teacherData.degree} className="input-field w-full p-3 rounded-xl" placeholder="e.g. PhD" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Department</label>
-                      <input name="department" defaultValue={teacherData.department} className="input-field w-full p-3 rounded-xl" placeholder="Department" />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">University</label>
-                      <input name="university" defaultValue={teacherData.university} className="input-field w-full p-3 rounded-xl" placeholder="University Name" />
-                    </div>
-                  </div>
-
-                  <div className="border-t border-slate-200 dark:border-slate-700 pt-6 mt-2">
-                    <h4 className="font-bold text-slate-900 dark:text-white mb-4">Security</h4>
-                    <div>
-                      <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">New Password (Optional)</label>
-                      <input name="password" type="password" className="input-field w-full p-3 rounded-xl" placeholder="Leave empty to keep current" />
-                    </div>
-                  </div>
-
-                  <button type="submit" className="btn-primary py-4 rounded-xl font-bold shadow-lg shadow-indigo-600/20 mt-2">
-                    Save Changes
-                  </button>
-                </form>
-              </div>
-            </div>
-          )}
-        </div>
-      </main>
-
-      {/* Create Course Modal */}
-      {showCreateCourse && (
-        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[200] p-4 overflow-y-auto">
-          <div className="modal-content p-8 rounded-2xl w-full max-w-lg shadow-2xl my-8">
-            <h2 className="text-2xl font-bold mb-6">Create New Course</h2>
-            <form onSubmit={handleCreateCourse} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2">
-                <label className="text-sm text-gray-400 mb-1 block">Course Title</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Advanced Mathematics"
-                  className="w-full input-field p-3 rounded-xl"
-                  value={newCourse.title}
-                  onChange={(e) => setNewCourse({ ...newCourse, title: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-bold text-slate-500 dark:text-gray-400">Subject Name</label>
-                <input
-                  type="text"
-                  className="w-full input-field p-3 rounded-xl"
-                  value={newCourse.subject}
-                  onChange={(e) => setNewCourse({ ...newCourse, subject: e.target.value })}
-                  placeholder="e.g. Calculus & Algebra"
-                  required
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-bold text-slate-500 dark:text-gray-400">Course Code (Optional)</label>
-                <input
-                  type="text"
-                  className="w-full input-field p-3 rounded-xl font-bold text-indigo-600 dark:text-indigo-400"
-                  value={newCourse.course_code}
-                  onChange={(e) => setNewCourse({ ...newCourse, course_code: e.target.value })}
-                  placeholder="e.g. MATH101"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-bold text-slate-500 dark:text-gray-400">Enrollment Key</label>
-                <input
-                  type="text"
-                  className="w-full input-field p-3 rounded-xl"
-                  value={newCourse.access_key}
-                  onChange={(e) => setNewCourse({ ...newCourse, access_key: e.target.value })}
-                  placeholder="e.g. MATH_KEY_2024"
-                  required
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-bold text-slate-500 dark:text-gray-400">Department</label>
-                <input
-                  type="text"
-                  className="w-full input-field p-3 rounded-xl"
-                  value={newCourse.department}
-                  onChange={(e) => setNewCourse({ ...newCourse, department: e.target.value })}
-                  placeholder="e.g. Computer Science"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-bold text-slate-500 dark:text-gray-400">Semester</label>
-                <input
-                  type="text"
-                  className="w-full input-field p-3 rounded-xl"
-                  value={newCourse.semester}
-                  onChange={(e) => setNewCourse({ ...newCourse, semester: e.target.value })}
-                  placeholder="e.g. Fall 2024"
-                />
-              </div>
-              <div className="flex flex-col gap-2 md:col-span-2">
-                <label className="text-sm font-bold text-slate-500 dark:text-gray-400">Course Description</label>
-                <textarea
-                  className="w-full input-field p-3 rounded-xl h-24 resize-none"
-                  value={newCourse.description}
-                  onChange={(e) => setNewCourse({ ...newCourse, description: e.target.value })}
-                  placeholder="Briefly describe the course objectives..."
-                  required
-                ></textarea>
-              </div>
-              <div className="md:col-span-2 flex items-center gap-2 mb-2">
-                <input
-                  type="checkbox"
-                  id="selfJoin"
-                  checked={newCourse.self_join_enabled}
-                  onChange={(e) => setNewCourse({ ...newCourse, self_join_enabled: e.target.checked })}
-                  className="w-4 h-4 rounded text-indigo-600"
-                />
-                <label htmlFor="selfJoin" className="text-sm">Allow students to self-enroll</label>
-              </div>
-              <div className="md:col-span-2 flex gap-4 mt-6">
-                <button type="button" className="flex-1 btn-secondary p-3 rounded-xl font-semibold" onClick={() => setShowCreateCourse(false)}>Cancel</button>
-                <button type="submit" className="flex-1 btn-primary p-3 rounded-xl font-semibold shadow-lg shadow-indigo-500/20">Create Course</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {/* Manual Question Modal */}
-      {showAddQuestion && (
-        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[200] p-4 overflow-y-auto">
-          <div className="modal-content p-8 rounded-2xl w-full max-w-6xl shadow-2xl my-8 relative flex flex-col lg:flex-row gap-12">
-            <button className="absolute top-6 right-6 text-slate-400 hover:text-slate-900 dark:hover:text-white transition" onClick={() => setShowAddQuestion(false)}><X size={24} /></button>
-
-            {/* Editor Side */}
-            <div className="flex-1 flex flex-col gap-6">
-              <div className="flex items-center gap-4 mb-2">
-                <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-lg shadow-indigo-600/20">
-                  <PlusCircle size={24} />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold">Add Question</h2>
-                  <p className="text-sm text-slate-500">{selectedQuiz?.title}</p>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-black uppercase tracking-widest text-indigo-500 mb-2 block">Type</label>
-                    <select
-                      className="w-full input-field p-4 rounded-xl font-bold bg-slate-100 dark:bg-slate-900 border-none text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
-                      value={newQuestion.question_type || 'mcq'}
-                      onChange={(e) => {
-                        const type = e.target.value;
-                        let update = { ...newQuestion, question_type: type };
-                        if (type === 'true_false') {
-                          update.option_a = 'True';
-                          update.option_b = 'False';
-                          update.option_c = '';
-                          update.option_d = '';
-                          update.correct_option = 'a';
-                        } else if (type === 'description') {
-                          update.option_a = '';
-                          update.option_b = '';
-                          update.option_c = '';
-                          update.option_d = '';
-                          update.correct_option = '';
-                        }
-                        setNewQuestion(update);
-                      }}
-                    >
-                      <option value="mcq">Multiple Choice</option>
-                      <option value="true_false">True / False</option>
-                      <option value="description">Description (Text)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-black uppercase tracking-widest text-indigo-500 mb-2 block">Points</label>
-                    <input
-                      type="number"
-                      className="w-full input-field p-4 rounded-xl text-center font-black"
-                      value={newQuestion.point_value}
-                      onChange={(e) => setNewQuestion({ ...newQuestion, point_value: parseInt(e.target.value) || 0 })}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs font-black uppercase tracking-widest text-indigo-500 mb-2 block">Question Text</label>
-                  <textarea
-                    placeholder="Enter the main question text here..."
-                    className="w-full input-field p-6 rounded-2xl h-32 resize-none font-medium text-lg leading-relaxed"
-                    value={newQuestion.text}
-                    onChange={(e) => setNewQuestion({ ...newQuestion, text: e.target.value })}
-                    required
-                  />
-                </div>
-
-                {(newQuestion.question_type === 'mcq' || !newQuestion.question_type) && (
-                  <>
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-700 pb-2">Personal Information</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {['a', 'b', 'c', 'd'].map((label) => (
-                        <div key={label}>
-                          <label className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2 block">Option {label.toUpperCase()}</label>
-                          <input
-                            type="text"
-                            className="w-full input-field p-4 rounded-xl font-medium"
-                            value={newQuestion[`option_${label}`]}
-                            onChange={(e) => setNewQuestion({ ...newQuestion, [`option_${label}`]: e.target.value })}
-                            placeholder={`Choice ${label.toUpperCase()}`}
-                            required
-                          />
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="flex flex-col gap-2 mt-4">
-                      <label className="text-xs font-black uppercase tracking-widest text-indigo-500 mb-2 block">Correct Answer</label>
-                      <div className="grid grid-cols-4 gap-2 p-1.5 bg-slate-900/50 rounded-2xl border border-slate-800">
-                        {['a', 'b', 'c', 'd'].map(opt => (
-                          <button
-                            key={opt}
-                            type="button"
-                            className={`py-3 rounded-xl font-black transition-all ${newQuestion.correct_option === opt
-                              ? 'bg-indigo-600 text-white shadow-lg'
-                              : 'text-slate-500 hover:text-white hover:bg-slate-800'
-                              }`}
-                            onClick={() => setNewQuestion({ ...newQuestion, correct_option: opt })}
-                          >
-                            {opt.toUpperCase()}
-                          </button>
-                        ))}
+                      <div>
+                        <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Full Name</label>
+                        <input name="full_name" defaultValue={teacherData.full_name} className="input-field w-full p-3 rounded-xl" placeholder="Your Name" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Email</label>
+                        <input name="email" defaultValue={teacherData.email} className="input-field w-full p-3 rounded-xl" placeholder="Email Address" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Mobile</label>
+                        <input name="mobile" defaultValue={teacherData.mobile} className="input-field w-full p-3 rounded-xl" placeholder="Phone Number" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Degree</label>
+                        <input name="degree" defaultValue={teacherData.degree} className="input-field w-full p-3 rounded-xl" placeholder="e.g. PhD" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Department</label>
+                        <input name="department" defaultValue={teacherData.department} className="input-field w-full p-3 rounded-xl" placeholder="Department" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">University</label>
+                        <input name="university" defaultValue={teacherData.university} className="input-field w-full p-3 rounded-xl" placeholder="University Name" />
                       </div>
                     </div>
-                  </>
-                )}
-
-                {newQuestion.question_type === 'true_false' && (
-                  <div className="flex flex-col gap-2 mt-4">
-                    <label className="text-xs font-black uppercase tracking-widest text-indigo-500 mb-2 block">Correct Answer</label>
-                    <div className="grid grid-cols-2 gap-4 p-1.5 bg-slate-900/50 rounded-2xl border border-slate-800">
-                      {['a', 'b'].map(opt => (
-                        <button
-                          key={opt}
-                          type="button"
-                          className={`py-3 rounded-xl font-black transition-all ${newQuestion.correct_option === opt
-                            ? 'bg-indigo-600 text-white shadow-lg'
-                            : 'text-slate-500 hover:text-white hover:bg-slate-800'
-                            }`}
-                          onClick={() => setNewQuestion({ ...newQuestion, correct_option: opt })}
-                        >
-                          {opt === 'a' ? 'True' : 'False'}
-                        </button>
-                      ))}
-                    </div>
+                    <button type="submit" className="btn-primary w-full py-4 rounded-xl font-bold shadow-lg shadow-indigo-600/20">
+                      Update Details
+                    </button>
                   </div>
-                )}
+                </form>
 
-                {newQuestion.question_type === 'description' && (
-                  <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl mt-4">
-                    <p className="text-yellow-500 text-xs font-bold uppercase tracking-widest mb-1">Teacher Graded</p>
-                    <p className="text-gray-400 text-sm">Students will write a text response. You will grade this manually.</p>
-                  </div>
-                )}
+                <div className="border-t border-slate-200 dark:border-slate-700 pt-8 mt-8">
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-700 pb-2 mb-4">Security & Password</h4>
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.target);
+                    const data = Object.fromEntries(formData.entries());
 
-                <div className="flex gap-4 pt-6">
-                  <button type="button" className="flex-1 btn-secondary py-4 rounded-2xl font-bold" onClick={() => setShowAddQuestion(false)}>Cancel</button>
-                  <button type="button" className="flex-2 btn-primary py-4 rounded-2xl font-bold shadow-lg shadow-indigo-600/20" onClick={handleAddQuestion}>Save Question</button>
-                </div>
-              </div>
-            </div>
-
-            {/* Preview Side */}
-            <div className="hidden lg:flex lg:w-96 flex-col">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Student Preview</h3>
-                <span className="text-[10px] text-slate-500 italic flex items-center gap-1"><Eye size={12} /> Live</span>
-              </div>
-              <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-10 shadow-inner relative overflow-hidden flex-1 flex items-center justify-center">
-                <div className="w-full bg-slate-800 p-8 rounded-[2rem] shadow-2xl border border-slate-700 relative">
-                  <div className="absolute -top-3 -left-3 w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-black shadow-lg">1</div>
-                  <div className="absolute top-4 right-6 text-[10px] font-black uppercase text-slate-500 tracking-tighter">{newQuestion.point_value || 1} Points</div>
-                  <p className={`text-xl font-bold mb-8 leading-relaxed ${!newQuestion.text ? 'opacity-20 italic' : ''}`}>
-                    {newQuestion.text || "Type your question..."}
-                  </p>
-                  <div className="space-y-3">
-                    {(newQuestion.question_type === 'mcq' || !newQuestion.question_type) && ['a', 'b', 'c', 'd'].map(label => (
-                      <div key={label} className={`p-4 rounded-xl border flex items-center gap-3 transition-all ${newQuestion.correct_option === label
-                        ? 'border-green-500/50 bg-green-500/5'
-                        : 'border-slate-700 opacity-40'}`}>
-                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-black ${newQuestion.correct_option === label
-                          ? 'bg-green-500 text-white'
-                          : 'bg-slate-700 text-slate-500'}`}>
-                          {label.toUpperCase()}
-                        </div>
-                        <span className={`text-sm font-semibold ${newQuestion.correct_option === label ? 'text-green-400' : 'text-slate-500'}`}>
-                          {newQuestion[`option_${label}`] || `Option ${label.toUpperCase()}`}
-                        </span>
-                      </div>
-                    ))}
-
-                    {newQuestion.question_type === 'true_false' && ['a', 'b'].map(label => (
-                      <div key={label} className={`p-4 rounded-xl border flex items-center gap-3 transition-all ${newQuestion.correct_option === label
-                        ? 'border-green-500/50 bg-green-500/5'
-                        : 'border-slate-700 opacity-40'}`}>
-                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-black ${newQuestion.correct_option === label
-                          ? 'bg-green-500 text-white'
-                          : 'bg-slate-700 text-slate-500'}`}>
-                          {label === 'a' ? 'T' : 'F'}
-                        </div>
-                        <span className={`text-sm font-semibold ${newQuestion.correct_option === label ? 'text-green-400' : 'text-slate-500'}`}>
-                          {label === 'a' ? 'True' : 'False'}
-                        </span>
-                      </div>
-                    ))}
-
-                    {newQuestion.question_type === 'description' && (
-                      <div className="p-4 rounded-xl border border-slate-700 bg-slate-900/50">
-                        <p className="text-slate-500 text-sm italic">Student answer area...</p>
-                        <div className="h-20 border border-dashed border-slate-700 rounded-lg mt-2 opacity-50"></div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Question Modal */}
-      {/* Attempt Grading Modal */}
-      {showGradingModal && selectedAttempt && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-center justify-center p-4">
-          <div className="bg-slate-100 dark:bg-slate-900 w-full max-w-5xl max-h-[90vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300">
-            {/* Header */}
-            <div className="px-10 py-8 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-800/50">
-              <div className="flex items-center gap-5">
-                <div className="w-16 h-16 bg-indigo-500 text-white rounded-3xl flex items-center justify-center font-black text-2xl shadow-lg shadow-indigo-500/20">
-                  {selectedAttempt.student?.full_name?.charAt(0) || "S"}
-                </div>
-                <div>
-                  <h3 className="text-2xl font-black text-slate-900 dark:text-white">{selectedAttempt.student?.full_name}</h3>
-                  <p className="text-slate-500 font-medium">{selectedAttempt.student?.email}</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">Total Score</div>
-                <div className="text-4xl font-black text-indigo-500">
-                  {(() => {
-                    // Dynamic Score Calculation
-                    const allQuestions = gradingModalQuestions.length > 0 ? gradingModalQuestions : (gradingQuizzes.find(q => q.id === selectedAttempt.quiz_id)?.questions || selectedAttempt.quiz?.questions || []);
-                    let currentScore = 0;
-
-                    allQuestions.forEach(q => {
-                      const qId = q.id.toString();
-                      const feedback = (selectedAttempt.feedback || {})[qId];
-
-                      // If marked manually, take that score
-                      if (feedback && typeof feedback.score === 'number') {
-                        currentScore += feedback.score;
-                      } else {
-                        // Auto-grading fallback
-                        const answer = (selectedAttempt.answers || {})[qId];
-                        const normalize = (val) => (val || "").toString().toLowerCase().trim();
-                        if (q.question_type !== 'description') {
-                          if (normalize(answer) === normalize(q.correct_option)) {
-                            currentScore += (q.point_value || 1);
-                          }
-                        }
-                      }
-                    });
-
-                    return currentScore;
-                  })()}<span className="text-slate-300 dark:text-slate-700 text-2xl font-medium"> / {selectedAttempt.total_marks}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-10 space-y-8 custom-scrollbar">
-              <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
-                <div className="flex items-center gap-3 text-indigo-400 font-bold mb-4 uppercase tracking-widest text-xs">
-                  <Shield size={16} /> Proctoring & Session Info
-                </div>
-                <div className="grid grid-cols-2 gap-8 text-center">
-                  <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl">
-                    <span className="text-slate-500 text-xs font-bold uppercase block mb-1">Violations</span>
-                    <div className={`text-2xl font-black ${selectedAttempt.eye_tracking_violations > 3 ? 'text-red-500' : 'text-slate-700 dark:text-slate-200'}`}>
-                      {selectedAttempt.eye_tracking_violations}
-                    </div>
-                  </div>
-                  <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl">
-                    <span className="text-slate-500 text-xs font-bold uppercase block mb-1">Completed</span>
-                    <div className="text-lg font-bold text-slate-700 dark:text-slate-200">
-                      {new Date(selectedAttempt.completed_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500 mb-4 flex items-center gap-3">
-                <div className="w-8 h-[1px] bg-indigo-500/30"></div>
-                Review Answers
-              </h4>
-
-              {/* Tabs: MCQ / T-F / Description */}
-              {(() => {
-                const allQuestions = gradingModalQuestions.length > 0 ? gradingModalQuestions : (gradingQuizzes.find(q => q.id === selectedAttempt.quiz_id)?.questions || selectedAttempt.quiz?.questions || []);
-
-                // Map over QUESTIONS, not answers, to ensure we show every question even if skipped
-                const entries = allQuestions.map((q) => {
-                  const qId = q.id.toString();
-                  const answer = (selectedAttempt.answers || {})[qId];
-                  return {
-                    qId,
-                    answer,
-                    question: q,
-                    type: q.question_type || (q.question_type === "true_false" ? "true_false" : "mcq")
-                  };
-                });
-
-                const counts = {
-                  all: entries.length,
-                  mcq: entries.filter(e => (e.question.question_type || "mcq") === "mcq").length,
-                  true_false: entries.filter(e => (e.question.question_type || "") === "true_false").length,
-                  description: entries.filter(e => (e.question.question_type || "") === "description").length
-                };
-
-                const filtered = gradingAnswerTab === "all" ? entries : entries.filter(e => (e.question.question_type || "mcq") === gradingAnswerTab);
-
-                return (
-                  <div>
-                    <div className="flex gap-3 mb-6">
-                      {[
-                        { id: "all", label: `All (${counts.all})` },
-                        { id: "mcq", label: `MCQ (${counts.mcq})` },
-                        { id: "true_false", label: `T/F (${counts.true_false})` },
-                        { id: "description", label: `Desc (${counts.description})` }
-                      ].map(tab => (
-                        <button
-                          key={tab.id}
-                          type="button"
-                          onClick={() => setGradingAnswerTab(tab.id)}
-                          className={`px-4 py-2 rounded-xl font-black text-xs uppercase tracking-wider ${gradingAnswerTab === tab.id ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-700'}`}
-                        >
-                          {tab.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="space-y-6">
-                      {filtered.length === 0 && (
-                        <div className="py-12 text-center text-slate-500">No answers in this category.</div>
-                      )}
-                      {filtered.map((entry, idx) => {
-                        const qId = entry.qId;
-                        const answer = entry.answer;
-                        const question = entry.question;
-                        const feedback = (selectedAttempt.feedback || {})[qId] || {};
-                        const pointInfo = question.point_value || 1;
-
-                        const normalize = (val) => (val || "").toString().toLowerCase().trim();
-                        const isCorrect = normalize(answer) === normalize(question.correct_option);
-                        const isNotAnswered = !answer;
-
-                        return (
-                          <div key={qId} className="bg-white dark:bg-slate-800/40 rounded-[2rem] p-8 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-indigo-500/30 transition-all group">
-
-                            {/* Question Header */}
-                            <div className="flex justify-between items-start mb-6 gap-6">
-                              <div className="flex items-start gap-4 flex-1">
-                                <span className="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black group-hover:bg-indigo-600 transition-colors shadow-lg shadow-indigo-500/10 shrink-0">{idx + 1}</span>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-3 mb-2">
-                                    <span className="text-slate-400 text-[10px] uppercase font-bold tracking-widest">Question</span>
-                                    {question.question_type !== "description" && (
-                                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${isNotAnswered
-                                        ? "bg-slate-100 dark:bg-slate-700 text-slate-500"
-                                        : isCorrect
-                                          ? "bg-green-500/10 text-green-500"
-                                          : "bg-red-500/10 text-red-500"
-                                        }`}>
-                                        {isNotAnswered ? "Not Answered" : isCorrect ? `+${pointInfo} Points` : "Wrong"}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="text-slate-700 dark:text-slate-200 font-bold text-lg leading-tight">
-                                    {question.question_text || question.text || "Question content unavailable"}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Marks Input */}
-                              <div className="flex flex-col items-end shrink-0">
-                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Marks (Max: {pointInfo})</span>
-                                <input
-                                  type="number"
-                                  className="w-24 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-center font-black text-indigo-500 focus:ring-2 focus:ring-indigo-500 outline-none text-xl transition-all"
-                                  value={feedback.score ?? (isCorrect ? pointInfo : 0)}
-                                  max={pointInfo}
-                                  min={0}
-                                  onChange={(e) => {
-                                    let val = parseInt(e.target.value) || 0;
-                                    if (val > pointInfo) val = pointInfo; // Validation
-                                    if (val < 0) val = 0;
-
-                                    const currentFeed = { ...(selectedAttempt.feedback || {}) };
-                                    const qFeed = currentFeed[qId] || {};
-                                    currentFeed[qId] = { ...qFeed, score: val };
-                                    setSelectedAttempt({ ...selectedAttempt, feedback: currentFeed });
-                                  }}
-                                />
-                              </div>
-                            </div>
-
-                            {/* Options / Answer Section */}
-                            <div className="mb-6">
-                              <div className="text-indigo-400 text-[10px] uppercase font-black mb-4 flex items-center gap-2 tracking-widest">
-                                <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse"></div>
-                                Student Answer (Click Option to Edit)
-                              </div>
-
-                              {question.question_type === 'description' ? (
-                                <textarea
-                                  className="w-full bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 font-bold text-slate-700 dark:text-slate-200 leading-relaxed min-h-[100px] shadow-inner focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                                  value={answer || ""}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    const currentAnswers = { ...(selectedAttempt.answers || {}) };
-                                    currentAnswers[qId] = val;
-                                    setSelectedAttempt({ ...selectedAttempt, answers: currentAnswers });
-                                  }}
-                                />
-                              ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                  {['a', 'b', 'c', 'd'].map((opt) => {
-                                    if (question.question_type === "true_false" && (opt === "c" || opt === "d")) return null;
-                                    const optText = question[`option_${opt}`];
-                                    const isStudentSelected = normalize(answer) === normalize(opt);
-                                    const isCorrectOpt = normalize(question.correct_option) === normalize(opt);
-
-                                    // Styling Logic (Same as Student View)
-                                    let cardClass = "bg-transparent border-slate-100 dark:border-slate-700 text-slate-500 opacity-60 hover:bg-slate-50 cursor-pointer";
-                                    let iconClass = "bg-slate-100 dark:bg-slate-700";
-
-                                    if (!isNotAnswered) {
-                                      if (isCorrectOpt) {
-                                        cardClass = "bg-green-500/10 border-green-500 text-green-700 dark:text-green-400 cursor-pointer";
-                                        iconClass = "bg-green-500 text-white";
-                                      } else if (isStudentSelected) {
-                                        cardClass = "bg-red-500/10 border-red-500 text-red-700 dark:text-red-400 cursor-pointer";
-                                        iconClass = "bg-red-500 text-white";
-                                      }
-                                    } else {
-                                      // Allow selection even if not answered
-                                      cardClass = "bg-transparent border-slate-100 dark:border-slate-700 text-slate-500 hover:border-indigo-300 cursor-pointer";
-                                    }
-
-                                    return (
-                                      <div
-                                        key={opt}
-                                        onClick={() => {
-                                          // Update Answer Logic
-                                          const currentAnswers = { ...(selectedAttempt.answers || {}) };
-                                          currentAnswers[qId] = opt;
-                                          setSelectedAttempt({ ...selectedAttempt, answers: currentAnswers });
-                                        }}
-                                        className={`p-4 rounded-2xl border-2 flex items-center gap-4 transition-all ${cardClass}`}
-                                      >
-                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black uppercase ${iconClass}`}>
-                                          {opt}
-                                        </div>
-                                        <div className="flex flex-col">
-                                          <span className="font-bold">{optText}</span>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Marking Notes */}
-                            <div>
-                              <div className="text-slate-400 text-[10px] uppercase font-black mb-2 flex items-center gap-2 tracking-widest">
-                                <Database size={12} /> Marking Notes / Feedback
-                              </div>
-                              <textarea
-                                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none min-h-[100px] transition-all"
-                                placeholder="Your comments for the student..."
-                                value={feedback.comment || ""}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  const currentFeed = { ...(selectedAttempt.feedback || {}) };
-                                  const qFeed = currentFeed[qId] || {};
-                                  currentFeed[qId] = { ...qFeed, comment: val };
-                                  setSelectedAttempt({ ...selectedAttempt, feedback: currentFeed });
-                                }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* Footer */}
-            <div className="px-10 py-8 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-6 bg-white dark:bg-slate-800/50">
-              <button
-                className="px-8 py-3 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all"
-                onClick={() => {
-                  setShowGradingModal(false);
-                  setSelectedAttempt(null);
-                }}
-              >
-                Discard Changes
-              </button>
-              <button
-                className="btn-primary px-12 py-3 rounded-2xl font-black shadow-2xl shadow-indigo-500/20 flex items-center gap-3 transform hover:scale-105 active:scale-95 transition-all text-sm uppercase tracking-widest"
-                disabled={isGrading}
-                onClick={async () => {
-                  setIsGrading(true);
-                  try {
-                    const token = localStorage.getItem("token");
-                    const res = await fetch(`http://127.0.0.1:8000/results/${selectedAttempt.id}/grade`, {
-                      method: "PUT",
-                      headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${token}`
-                      },
-                      body: JSON.stringify({
-                        feedback: selectedAttempt.feedback || {},
-                        answers: selectedAttempt.answers || {}
-                      })
-                    });
-
-                    if (res.ok) {
-                      alert("GRADING SUCCESS: Data synced to student portal.");
-                      setShowGradingModal(false);
-                      setSelectedAttempt(null);
-                      fetchAllResults(); // Refresh list
-                    } else {
-                      alert("GRADNG ERROR: Server rejected the payload.");
+                    if (data.new_password !== data.confirm_new_password) {
+                      alert("New passwords do not match!");
+                      return;
                     }
-                  } catch (err) {
-                    alert("NETWORK ERROR: Connection failed.");
-                  } finally {
-                    setIsGrading(false);
-                  }
-                }}
-              >
-                {isGrading ? "Processing..." : "Submit Marking"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {showEditQuestion && editingQuestion && (
-        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[200] p-4 overflow-y-auto">
-          <div className="modal-content p-8 rounded-2xl w-full max-w-6xl shadow-2xl my-8 relative flex flex-col lg:flex-row gap-12">
-            <button className="absolute top-6 right-6 text-slate-400 hover:text-slate-900 dark:hover:text-white transition" onClick={() => setShowEditQuestion(false)}><X size={24} /></button>
-
-            {/* Editor Side */}
-            <div className="flex-1 flex flex-col gap-6">
-              <div className="flex items-center gap-4 mb-2">
-                <div className="p-3 bg-amber-500 rounded-2xl text-white shadow-lg shadow-amber-500/20">
-                  <Pencil size={24} />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold">Edit Question</h2>
-                  <p className="text-sm text-slate-500">{selectedQuiz?.title} • ID: {editingQuestion.id}</p>
+                    try {
+                      const token = localStorage.getItem("token");
+                      const res = await fetch("http://127.0.0.1:8000/auth/change-password", {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json",
+                          "Authorization": `Bearer ${token}`
+                        },
+                        body: JSON.stringify(data)
+                      });
+                      if (res.ok) {
+                        alert("Password updated successfully!");
+                        e.target.reset();
+                      } else {
+                        const err = await res.json();
+                        alert("Update failed: " + (err.detail || "Unknown error"));
+                      }
+                    } catch (err) {
+                      alert("Network error");
+                    }
+                  }} className="flex flex-col gap-4">
+                    <div>
+                      <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Old Password</label>
+                      <div className="relative">
+                        <input
+                          name="old_password"
+                          type={showOldPass ? "text" : "password"}
+                          required
+                          className="input-field w-full p-3 rounded-xl"
+                          placeholder="••••••••"
+                        />
+                        <button
+                          type="button"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition"
+                          onClick={() => setShowOldPass(!showOldPass)}
+                        >
+                          {showOldPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">New Password</label>
+                        <div className="relative">
+                          <input
+                            name="new_password"
+                            type={showNewPass ? "text" : "password"}
+                            required
+                            className="input-field w-full p-3 rounded-xl"
+                            placeholder="••••••••"
+                          />
+                          <button
+                            type="button"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition"
+                            onClick={() => setShowNewPass(!showNewPass)}
+                          >
+                            {showNewPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Confirm New Password</label>
+                        <div className="relative">
+                          <input
+                            name="confirm_new_password"
+                            type={showConfirmPass ? "text" : "password"}
+                            required
+                            className="input-field w-full p-3 rounded-xl"
+                            placeholder="••••••••"
+                          />
+                          <button
+                            type="button"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition"
+                            onClick={() => setShowConfirmPass(!showConfirmPass)}
+                          >
+                            {showConfirmPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <button type="submit" className="bg-slate-900 dark:bg-indigo-600 text-white py-4 rounded-xl font-bold shadow-lg hover:opacity-90 transition">
+                      Change Password
+                    </button>
+                  </form>
                 </div>
               </div>
+            </div>
+          )
+          }
 
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs font-black uppercase tracking-widest text-indigo-500 mb-2 block">Question Text</label>
-                  <textarea
-                    placeholder="Enter the main question text here..."
-                    className="w-full input-field p-6 rounded-2xl h-40 resize-none font-medium text-lg leading-relaxed"
-                    value={editingQuestion.text}
-                    onChange={(e) => setEditingQuestion({ ...editingQuestion, text: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {['a', 'b', 'c', 'd'].map((label) => (
-                    <div key={label}>
-                      <label className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2 block">Option {label.toUpperCase()}</label>
+          {/* Create Course Modal */}
+          {
+            showCreateCourse && (
+              <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[200] p-4 overflow-y-auto">
+                <div className="modal-content p-8 rounded-2xl w-full max-w-lg shadow-2xl my-8">
+                  <h2 className="text-2xl font-bold mb-6">Create New Course</h2>
+                  <form onSubmit={handleCreateCourse} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                      <label className="text-sm text-gray-400 mb-1 block">Course Title</label>
                       <input
                         type="text"
-                        className="w-full input-field p-4 rounded-xl font-medium"
-                        value={editingQuestion[`option_${label}`]}
-                        onChange={(e) => setEditingQuestion({ ...editingQuestion, [`option_${label}`]: e.target.value })}
+                        placeholder="e.g. Advanced Mathematics"
+                        className="w-full input-field p-3 rounded-xl"
+                        value={newCourse.title}
+                        onChange={(e) => setNewCourse({ ...newCourse, title: e.target.value })}
                         required
                       />
                     </div>
-                  ))}
+                    <div className="flex flex-col gap-2">
+                      <label className="text-sm font-bold text-slate-500 dark:text-gray-400">Subject Name</label>
+                      <input
+                        type="text"
+                        className="w-full input-field p-3 rounded-xl"
+                        value={newCourse.subject}
+                        onChange={(e) => setNewCourse({ ...newCourse, subject: e.target.value })}
+                        placeholder="e.g. Calculus & Algebra"
+                        required
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-sm font-bold text-slate-500 dark:text-gray-400">Course Code (Optional)</label>
+                      <input
+                        type="text"
+                        className="w-full input-field p-3 rounded-xl font-bold text-indigo-600 dark:text-indigo-400"
+                        value={newCourse.course_code}
+                        onChange={(e) => setNewCourse({ ...newCourse, course_code: e.target.value })}
+                        placeholder="e.g. MATH101"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-sm font-bold text-slate-500 dark:text-gray-400">Enrollment Key</label>
+                      <input
+                        type="text"
+                        className="w-full input-field p-3 rounded-xl"
+                        value={newCourse.access_key}
+                        onChange={(e) => setNewCourse({ ...newCourse, access_key: e.target.value })}
+                        placeholder="e.g. MATH_KEY_2024"
+                        required
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-sm font-bold text-slate-500 dark:text-gray-400">Department</label>
+                      <input
+                        type="text"
+                        className="w-full input-field p-3 rounded-xl"
+                        value={newCourse.department}
+                        onChange={(e) => setNewCourse({ ...newCourse, department: e.target.value })}
+                        placeholder="e.g. Computer Science"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-sm font-bold text-slate-500 dark:text-gray-400">Semester</label>
+                      <input
+                        type="text"
+                        className="w-full input-field p-3 rounded-xl"
+                        value={newCourse.semester}
+                        onChange={(e) => setNewCourse({ ...newCourse, semester: e.target.value })}
+                        placeholder="e.g. Fall 2024"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2 md:col-span-2">
+                      <label className="text-sm font-bold text-slate-500 dark:text-gray-400">Course Description</label>
+                      <textarea
+                        className="w-full input-field p-3 rounded-xl h-24 resize-none"
+                        value={newCourse.description}
+                        onChange={(e) => setNewCourse({ ...newCourse, description: e.target.value })}
+                        placeholder="Briefly describe the course objectives..."
+                        required
+                      ></textarea>
+                    </div>
+                    <div className="md:col-span-2 flex items-center gap-2 mb-2">
+                      <input
+                        type="checkbox"
+                        id="selfJoin"
+                        checked={newCourse.self_join_enabled}
+                        onChange={(e) => setNewCourse({ ...newCourse, self_join_enabled: e.target.checked })}
+                        className="w-4 h-4 rounded text-indigo-600"
+                      />
+                      <label htmlFor="selfJoin" className="text-sm">Allow students to self-enroll</label>
+                    </div>
+                    <div className="md:col-span-2 flex gap-4 mt-6">
+                      <button type="button" className="flex-1 btn-secondary p-3 rounded-xl font-semibold" onClick={() => setShowCreateCourse(false)}>Cancel</button>
+                      <button type="submit" className="flex-1 btn-primary p-3 rounded-xl font-semibold shadow-lg shadow-indigo-500/20">Create Course</button>
+                    </div>
+                  </form>
                 </div>
+              </div>
+            )
+          }
+          {/* Manual Question Modal */}
+          {
+            showAddQuestion && (
+              <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[200] p-4 overflow-y-auto">
+                <div className="modal-content p-8 rounded-2xl w-full max-w-6xl shadow-2xl my-8 relative flex flex-col lg:flex-row gap-12">
+                  <button className="absolute top-6 right-6 text-slate-400 hover:text-slate-900 dark:hover:text-white transition" onClick={() => setShowAddQuestion(false)}><X size={24} /></button>
 
-                <div className="flex flex-col md:flex-row gap-6 mt-4">
-                  <div className="flex-1">
-                    <label className="text-xs font-black uppercase tracking-widest text-indigo-500 mb-2 block">Correct Answer</label>
-                    <div className="grid grid-cols-4 gap-2 p-1.5 bg-slate-900/50 rounded-2xl border border-slate-800">
-                      {['a', 'b', 'c', 'd'].map(opt => (
-                        <button
-                          key={opt}
-                          type="button"
-                          className={`py-3 rounded-xl font-black transition-all ${editingQuestion.correct_option === opt
-                            ? 'bg-indigo-600 text-white shadow-lg'
-                            : 'text-slate-500 hover:text-white hover:bg-slate-800'
-                            }`}
-                          onClick={() => setEditingQuestion({ ...editingQuestion, correct_option: opt })}
-                        >
-                          {opt.toUpperCase()}
-                        </button>
-                      ))}
+                  {/* Editor Side */}
+                  <div className="flex-1 flex flex-col gap-6">
+                    <div className="flex items-center gap-4 mb-2">
+                      <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-lg shadow-indigo-600/20">
+                        <PlusCircle size={24} />
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-bold">Add Question</h2>
+                        <p className="text-sm text-slate-500">{selectedQuiz?.title}</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-black uppercase tracking-widest text-indigo-500 mb-2 block">Type</label>
+                          <select
+                            className="w-full input-field p-4 rounded-xl font-bold bg-slate-100 dark:bg-slate-900 border-none text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
+                            value={newQuestion.question_type || 'mcq'}
+                            onChange={(e) => {
+                              const type = e.target.value;
+                              let update = { ...newQuestion, question_type: type };
+                              if (type === 'true_false') {
+                                update.option_a = 'True';
+                                update.option_b = 'False';
+                                update.option_c = '';
+                                update.option_d = '';
+                                update.correct_option = 'a';
+                              } else if (type === 'description') {
+                                update.option_a = '';
+                                update.option_b = '';
+                                update.option_c = '';
+                                update.option_d = '';
+                                update.correct_option = '';
+                              }
+                              setNewQuestion(update);
+                            }}
+                          >
+                            <option value="mcq">Multiple Choice</option>
+                            <option value="true_false">True / False</option>
+                            <option value="description">Description (Text)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs font-black uppercase tracking-widest text-indigo-500 mb-2 block">Points</label>
+                          <input
+                            type="number"
+                            className="w-full input-field p-4 rounded-xl text-center font-black"
+                            value={newQuestion.point_value}
+                            onChange={(e) => setNewQuestion({ ...newQuestion, point_value: parseInt(e.target.value) || 0 })}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-black uppercase tracking-widest text-indigo-500 mb-2 block">Question Text</label>
+                        <textarea
+                          placeholder="Enter the main question text here..."
+                          className="w-full input-field p-6 rounded-2xl h-32 resize-none font-medium text-lg leading-relaxed"
+                          value={newQuestion.text}
+                          onChange={(e) => setNewQuestion({ ...newQuestion, text: e.target.value })}
+                          required
+                        />
+                      </div>
+
+                      {(newQuestion.question_type === 'mcq' || !newQuestion.question_type) && (
+                        <>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {['a', 'b', 'c', 'd'].map((label) => (
+                              <div key={label}>
+                                <label className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2 block">Option {label.toUpperCase()}</label>
+                                <input
+                                  type="text"
+                                  className="w-full input-field p-4 rounded-xl font-medium"
+                                  value={newQuestion[`option_${label}`]}
+                                  onChange={(e) => setNewQuestion({ ...newQuestion, [`option_${label}`]: e.target.value })}
+                                  placeholder={`Choice ${label.toUpperCase()}`}
+                                  required
+                                />
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="flex flex-col gap-2 mt-4">
+                            <label className="text-xs font-black uppercase tracking-widest text-indigo-500 mb-2 block">Correct Answer</label>
+                            <div className="grid grid-cols-4 gap-2 p-1.5 bg-slate-900/50 rounded-2xl border border-slate-800">
+                              {['a', 'b', 'c', 'd'].map(opt => (
+                                <button
+                                  key={opt}
+                                  type="button"
+                                  className={`py-3 rounded-xl font-black transition-all ${newQuestion.correct_option === opt
+                                    ? 'bg-indigo-600 text-white shadow-lg'
+                                    : 'text-slate-500 hover:text-white hover:bg-slate-800'
+                                    }`}
+                                  onClick={() => setNewQuestion({ ...newQuestion, correct_option: opt })}
+                                >
+                                  {opt.toUpperCase()}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {newQuestion.question_type === 'true_false' && (
+                        <div className="flex flex-col gap-2 mt-4">
+                          <label className="text-xs font-black uppercase tracking-widest text-indigo-500 mb-2 block">Correct Answer</label>
+                          <div className="grid grid-cols-2 gap-4 p-1.5 bg-slate-900/50 rounded-2xl border border-slate-800">
+                            {['a', 'b'].map(opt => (
+                              <button
+                                key={opt}
+                                type="button"
+                                className={`py-3 rounded-xl font-black transition-all ${newQuestion.correct_option === opt
+                                  ? 'bg-indigo-600 text-white shadow-lg'
+                                  : 'text-slate-500 hover:text-white hover:bg-slate-800'
+                                  }`}
+                                onClick={() => setNewQuestion({ ...newQuestion, correct_option: opt })}
+                              >
+                                {opt === 'a' ? 'True' : 'False'}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {newQuestion.question_type === 'description' && (
+                        <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl mt-4">
+                          <p className="text-yellow-500 text-xs font-bold uppercase tracking-widest mb-1">Teacher Graded</p>
+                          <p className="text-gray-400 text-sm">Students will write a text response. You will grade this manually.</p>
+                        </div>
+                      )}
+
+                      <div className="flex gap-4 pt-6">
+                        <button type="button" className="flex-1 btn-secondary py-4 rounded-2xl font-bold" onClick={() => setShowAddQuestion(false)}>Cancel</button>
+                        <button type="button" className="flex-2 btn-primary py-4 rounded-2xl font-bold shadow-lg shadow-indigo-600/20" onClick={handleAddQuestion}>Save Question</button>
+                      </div>
                     </div>
                   </div>
-                  <div className="w-full md:w-32">
-                    <label className="text-xs font-black uppercase tracking-widest text-indigo-500 mb-2 block">Points</label>
-                    <input
-                      type="number"
-                      className="w-full input-field p-4 rounded-2xl text-center font-black"
-                      value={editingQuestion.point_value}
-                      onChange={(e) => setEditingQuestion({ ...editingQuestion, point_value: parseInt(e.target.value) || 0 })}
-                    />
-                  </div>
-                </div>
 
-                <div className="flex gap-4 pt-6">
-                  <button type="button" className="flex-1 btn-secondary py-4 rounded-2xl font-bold" onClick={() => setShowEditQuestion(false)}>Cancel</button>
-                  <button type="button" className="flex-1 bg-amber-500 text-white py-4 rounded-2xl font-bold shadow-lg shadow-amber-500/20" onClick={handleUpdateQuestion}>Update Question</button>
-                </div>
-              </div>
-            </div>
+                  {/* Preview Side */}
+                  <div className="hidden lg:flex lg:w-96 flex-col">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Student Preview</h3>
+                      <span className="text-[10px] text-slate-500 italic flex items-center gap-1"><Eye size={12} /> Live</span>
+                    </div>
+                    <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-10 shadow-inner relative overflow-hidden flex-1 flex items-center justify-center">
+                      <div className="w-full bg-slate-800 p-8 rounded-[2rem] shadow-2xl border border-slate-700 relative">
+                        <div className="absolute -top-3 -left-3 w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-black shadow-lg">1</div>
+                        <div className="absolute top-4 right-6 text-[10px] font-black uppercase text-slate-500 tracking-tighter">{newQuestion.point_value || 1} Points</div>
+                        <p className={`text-xl font-bold mb-8 leading-relaxed ${!newQuestion.text ? 'opacity-20 italic' : ''}`}>
+                          {newQuestion.text || "Type your question..."}
+                        </p>
+                        <div className="space-y-3">
+                          {(newQuestion.question_type === 'mcq' || !newQuestion.question_type) && ['a', 'b', 'c', 'd'].map(label => (
+                            <div key={label} className={`p-4 rounded-xl border flex items-center gap-3 transition-all ${newQuestion.correct_option === label
+                              ? 'border-green-500/50 bg-green-500/5'
+                              : 'border-slate-700 opacity-40'}`}>
+                              <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-black ${newQuestion.correct_option === label
+                                ? 'bg-green-500 text-white'
+                                : 'bg-slate-700 text-slate-500'}`}>
+                                {label.toUpperCase()}
+                              </div>
+                              <span className={`text-sm font-semibold ${newQuestion.correct_option === label ? 'text-green-400' : 'text-slate-500'}`}>
+                                {newQuestion[`option_${label}`] || `Option ${label.toUpperCase()}`}
+                              </span>
+                            </div>
+                          ))}
 
-            {/* Preview Side */}
-            <div className="hidden lg:flex lg:w-96 flex-col">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Live Preview</h3>
-                <span className="text-[10px] text-slate-500 italic flex items-center gap-1"><Eye size={12} /> Editing</span>
-              </div>
-              <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-10 shadow-inner relative overflow-hidden flex-1 flex items-center justify-center">
-                <div className="w-full bg-slate-800 p-8 rounded-[2rem] shadow-2xl border border-slate-700 relative">
-                  <div className="absolute -top-3 -left-3 w-10 h-10 bg-amber-500 text-white rounded-xl flex items-center justify-center font-black shadow-lg">!</div>
-                  <div className="absolute top-4 right-6 text-[10px] font-black uppercase text-slate-500 tracking-tighter">{editingQuestion.point_value || 1} Points</div>
-                  <p className={`text-xl font-bold mb-8 leading-relaxed ${!editingQuestion.text ? 'opacity-20 italic' : ''}`}>
-                    {editingQuestion.text || "Type your question..."}
-                  </p>
-                  <div className="space-y-3">
-                    {['a', 'b', 'c', 'd'].map(label => (
-                      <div key={label} className={`p-4 rounded-xl border flex items-center gap-3 transition-all ${editingQuestion.correct_option === label
-                        ? 'border-green-500/50 bg-green-500/5'
-                        : 'border-slate-700 opacity-40'}`}>
-                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-black ${editingQuestion.correct_option === label
-                          ? 'bg-green-500 text-white'
-                          : 'bg-slate-700 text-slate-500'}`}>
-                          {label.toUpperCase()}
+                          {newQuestion.question_type === 'true_false' && ['a', 'b'].map(label => (
+                            <div key={label} className={`p-4 rounded-xl border flex items-center gap-3 transition-all ${newQuestion.correct_option === label
+                              ? 'border-green-500/50 bg-green-500/5'
+                              : 'border-slate-700 opacity-40'}`}>
+                              <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-black ${newQuestion.correct_option === label
+                                ? 'bg-green-500 text-white'
+                                : 'bg-slate-700 text-slate-500'}`}>
+                                {label === 'a' ? 'T' : 'F'}
+                              </div>
+                              <span className={`text-sm font-semibold ${newQuestion.correct_option === label ? 'text-green-400' : 'text-slate-500'}`}>
+                                {label === 'a' ? 'True' : 'False'}
+                              </span>
+                            </div>
+                          ))}
+
+                          {newQuestion.question_type === 'description' && (
+                            <div className="p-4 rounded-xl border border-slate-700 bg-slate-900/50">
+                              <p className="text-slate-500 text-sm italic">Student answer area...</p>
+                              <div className="h-20 border border-dashed border-slate-700 rounded-lg mt-2 opacity-50"></div>
+                            </div>
+                          )}
                         </div>
-                        <span className={`text-sm font-semibold ${editingQuestion.correct_option === label ? 'text-green-400' : 'text-slate-500'}`}>
-                          {editingQuestion[`option_${label}`] || `Option ${label.toUpperCase()}`}
-                        </span>
                       </div>
-                    ))}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
+            )
+          }
+
+          {/* Edit Question Modal */}
+          {/* Attempt Grading Modal */}
+          {
+            showGradingModal && selectedAttempt && (
+              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-center justify-center p-4">
+                <div className="bg-slate-100 dark:bg-slate-900 w-full max-w-5xl max-h-[90vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300">
+                  {/* Header */}
+                  <div className="px-10 py-8 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-800/50">
+                    <div className="flex items-center gap-5">
+                      <div className="w-16 h-16 bg-indigo-500 text-white rounded-3xl flex items-center justify-center font-black text-2xl shadow-lg shadow-indigo-500/20">
+                        {selectedAttempt.student?.full_name?.charAt(0) || "S"}
+                      </div>
+                      <div>
+                        <h3 className="text-2xl font-black text-slate-900 dark:text-white">{selectedAttempt.student?.full_name}</h3>
+                        <p className="text-slate-500 font-medium">{selectedAttempt.student?.email}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">Total Score</div>
+                      <div className="text-4xl font-black text-indigo-500">
+                        {(() => {
+                          // Dynamic Score Calculation
+                          const allQuestions = gradingModalQuestions.length > 0 ? gradingModalQuestions : (gradingQuizzes.find(q => q.id === selectedAttempt.quiz_id)?.questions || selectedAttempt.quiz?.questions || []);
+                          let currentScore = 0;
+
+                          allQuestions.forEach(q => {
+                            const qId = q.id.toString();
+                            const feedback = (selectedAttempt.feedback || {})[qId];
+
+                            // If marked manually, take that score
+                            if (feedback && typeof feedback.score === 'number') {
+                              currentScore += feedback.score;
+                            } else {
+                              // Auto-grading fallback
+                              const answer = (selectedAttempt.answers || {})[qId];
+                              const normalize = (val) => (val || "").toString().toLowerCase().trim();
+                              if (q.question_type !== 'description') {
+                                if (normalize(answer) === normalize(q.correct_option)) {
+                                  currentScore += (q.point_value || 1);
+                                }
+                              }
+                            }
+                          });
+
+                          return currentScore;
+                        })()}<span className="text-slate-300 dark:text-slate-700 text-2xl font-medium"> / {selectedAttempt.total_marks}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 overflow-y-auto p-10 space-y-8 custom-scrollbar">
+                    <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
+                      <div className="flex items-center gap-3 text-indigo-400 font-bold mb-4 uppercase tracking-widest text-xs">
+                        <Shield size={16} /> Proctoring & Session Info
+                      </div>
+                      <div className="grid grid-cols-2 gap-8 text-center">
+                        <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl">
+                          <span className="text-slate-500 text-xs font-bold uppercase block mb-1">Violations</span>
+                          <div className={`text-2xl font-black ${selectedAttempt.eye_tracking_violations > 3 ? 'text-red-500' : 'text-slate-700 dark:text-slate-200'}`}>
+                            {selectedAttempt.eye_tracking_violations}
+                          </div>
+                        </div>
+                        <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl">
+                          <span className="text-slate-500 text-xs font-bold uppercase block mb-1">Completed</span>
+                          <div className="text-lg font-bold text-slate-700 dark:text-slate-200">
+                            {new Date(selectedAttempt.completed_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500 mb-4 flex items-center gap-3">
+                      <div className="w-8 h-[1px] bg-indigo-500/30"></div>
+                      Review Answers
+                    </h4>
+
+                    {/* Tabs: MCQ / T-F / Description */}
+                    {(() => {
+                      const allQuestions = gradingModalQuestions.length > 0 ? gradingModalQuestions : (gradingQuizzes.find(q => q.id === selectedAttempt.quiz_id)?.questions || selectedAttempt.quiz?.questions || []);
+
+                      // Map over QUESTIONS, not answers, to ensure we show every question even if skipped
+                      const entries = allQuestions.map((q) => {
+                        const qId = q.id.toString();
+                        const answer = (selectedAttempt.answers || {})[qId];
+                        return {
+                          qId,
+                          answer,
+                          question: q,
+                          type: q.question_type || (q.question_type === "true_false" ? "true_false" : "mcq")
+                        };
+                      });
+
+                      const counts = {
+                        all: entries.length,
+                        mcq: entries.filter(e => (e.question.question_type || "mcq") === "mcq").length,
+                        true_false: entries.filter(e => (e.question.question_type || "") === "true_false").length,
+                        description: entries.filter(e => (e.question.question_type || "") === "description").length
+                      };
+
+                      const filtered = gradingAnswerTab === "all" ? entries : entries.filter(e => (e.question.question_type || "mcq") === gradingAnswerTab);
+
+                      return (
+                        <div>
+                          <div className="flex gap-3 mb-6">
+                            {[
+                              { id: "all", label: `All (${counts.all})` },
+                              { id: "mcq", label: `MCQ (${counts.mcq})` },
+                              { id: "true_false", label: `T/F (${counts.true_false})` },
+                              { id: "description", label: `Desc (${counts.description})` }
+                            ].map(tab => (
+                              <button
+                                key={tab.id}
+                                type="button"
+                                onClick={() => setGradingAnswerTab(tab.id)}
+                                className={`px-4 py-2 rounded-xl font-black text-xs uppercase tracking-wider ${gradingAnswerTab === tab.id ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-700'}`}
+                              >
+                                {tab.label}
+                              </button>
+                            ))}
+                          </div>
+
+                          <div className="space-y-6">
+                            {filtered.length === 0 && (
+                              <div className="py-12 text-center text-slate-500">No answers in this category.</div>
+                            )}
+                            {filtered.map((entry, idx) => {
+                              const qId = entry.qId;
+                              const answer = entry.answer;
+                              const question = entry.question;
+                              const feedback = (selectedAttempt.feedback || {})[qId] || {};
+                              const pointInfo = question.point_value || 1;
+
+                              const normalize = (val) => (val || "").toString().toLowerCase().trim();
+                              const isCorrect = normalize(answer) === normalize(question.correct_option);
+                              const isNotAnswered = !answer;
+
+                              return (
+                                <div key={qId} className="bg-white dark:bg-slate-800/40 rounded-[2rem] p-8 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-indigo-500/30 transition-all group">
+
+                                  {/* Question Header */}
+                                  <div className="flex justify-between items-start mb-6 gap-6">
+                                    <div className="flex items-start gap-4 flex-1">
+                                      <span className="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black group-hover:bg-indigo-600 transition-colors shadow-lg shadow-indigo-500/10 shrink-0">{idx + 1}</span>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-3 mb-2">
+                                          <span className="text-slate-400 text-[10px] uppercase font-bold tracking-widest">Question</span>
+                                          {question.question_type !== "description" && (
+                                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${isNotAnswered
+                                              ? "bg-slate-100 dark:bg-slate-700 text-slate-500"
+                                              : isCorrect
+                                                ? "bg-green-500/10 text-green-500"
+                                                : "bg-red-500/10 text-red-500"
+                                              }`}>
+                                              {isNotAnswered ? "Not Answered" : isCorrect ? `+${pointInfo} Points` : "Wrong"}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="text-slate-700 dark:text-slate-200 font-bold text-lg leading-tight">
+                                          {question.question_text || question.text || "Question content unavailable"}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Marks Input */}
+                                    <div className="flex flex-col items-end shrink-0">
+                                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Marks (Max: {pointInfo})</span>
+                                      <input
+                                        type="number"
+                                        className="w-24 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-center font-black text-indigo-500 focus:ring-2 focus:ring-indigo-500 outline-none text-xl transition-all"
+                                        value={feedback.score ?? (isCorrect ? pointInfo : 0)}
+                                        max={pointInfo}
+                                        min={0}
+                                        onChange={(e) => {
+                                          let val = parseInt(e.target.value) || 0;
+                                          if (val > pointInfo) val = pointInfo; // Validation
+                                          if (val < 0) val = 0;
+
+                                          const currentFeed = { ...(selectedAttempt.feedback || {}) };
+                                          const qFeed = currentFeed[qId] || {};
+                                          currentFeed[qId] = { ...qFeed, score: val };
+                                          setSelectedAttempt({ ...selectedAttempt, feedback: currentFeed });
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Options / Answer Section */}
+                                  <div className="mb-6">
+                                    <div className="text-indigo-400 text-[10px] uppercase font-black mb-4 flex items-center gap-2 tracking-widest">
+                                      <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse"></div>
+                                      Student Answer (Click Option to Edit)
+                                    </div>
+
+                                    {question.question_type === 'description' ? (
+                                      <textarea
+                                        className="w-full bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 font-bold text-slate-700 dark:text-slate-200 leading-relaxed min-h-[100px] shadow-inner focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                                        value={answer || ""}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          const currentAnswers = { ...(selectedAttempt.answers || {}) };
+                                          currentAnswers[qId] = val;
+                                          setSelectedAttempt({ ...selectedAttempt, answers: currentAnswers });
+                                        }}
+                                      />
+                                    ) : (
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {['a', 'b', 'c', 'd'].map((opt) => {
+                                          if (question.question_type === "true_false" && (opt === "c" || opt === "d")) return null;
+                                          const optText = question[`option_${opt}`];
+                                          const isStudentSelected = normalize(answer) === normalize(opt);
+                                          const isCorrectOpt = normalize(question.correct_option) === normalize(opt);
+
+                                          // Styling Logic (Same as Student View)
+                                          let cardClass = "bg-transparent border-slate-100 dark:border-slate-700 text-slate-500 opacity-60 hover:bg-slate-50 cursor-pointer";
+                                          let iconClass = "bg-slate-100 dark:bg-slate-700";
+
+                                          if (!isNotAnswered) {
+                                            if (isCorrectOpt) {
+                                              cardClass = "bg-green-500/10 border-green-500 text-green-700 dark:text-green-400 cursor-pointer";
+                                              iconClass = "bg-green-500 text-white";
+                                            } else if (isStudentSelected) {
+                                              cardClass = "bg-red-500/10 border-red-500 text-red-700 dark:text-red-400 cursor-pointer";
+                                              iconClass = "bg-red-500 text-white";
+                                            }
+                                          } else {
+                                            // Allow selection even if not answered
+                                            cardClass = "bg-transparent border-slate-100 dark:border-slate-700 text-slate-500 hover:border-indigo-300 cursor-pointer";
+                                          }
+
+                                          return (
+                                            <div
+                                              key={opt}
+                                              onClick={() => {
+                                                // Update Answer Logic
+                                                const currentAnswers = { ...(selectedAttempt.answers || {}) };
+                                                currentAnswers[qId] = opt;
+                                                setSelectedAttempt({ ...selectedAttempt, answers: currentAnswers });
+                                              }}
+                                              className={`p-4 rounded-2xl border-2 flex items-center gap-4 transition-all ${cardClass}`}
+                                            >
+                                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black uppercase ${iconClass}`}>
+                                                {opt}
+                                              </div>
+                                              <div className="flex flex-col">
+                                                <span className="font-bold">{optText}</span>
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Marking Notes */}
+                                  <div>
+                                    <div className="text-slate-400 text-[10px] uppercase font-black mb-2 flex items-center gap-2 tracking-widest">
+                                      <Database size={12} /> Marking Notes / Feedback
+                                    </div>
+                                    <textarea
+                                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none min-h-[100px] transition-all"
+                                      placeholder="Your comments for the student..."
+                                      value={feedback.comment || ""}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        const currentFeed = { ...(selectedAttempt.feedback || {}) };
+                                        const qFeed = currentFeed[qId] || {};
+                                        currentFeed[qId] = { ...qFeed, comment: val };
+                                        setSelectedAttempt({ ...selectedAttempt, feedback: currentFeed });
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="px-10 py-8 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-6 bg-white dark:bg-slate-800/50">
+                    <button
+                      className="px-8 py-3 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all"
+                      onClick={() => {
+                        setShowGradingModal(false);
+                        setSelectedAttempt(null);
+                      }}
+                    >
+                      Discard Changes
+                    </button>
+                    <button
+                      className="btn-primary px-12 py-3 rounded-2xl font-black shadow-2xl shadow-indigo-500/20 flex items-center gap-3 transform hover:scale-105 active:scale-95 transition-all text-sm uppercase tracking-widest"
+                      disabled={isGrading}
+                      onClick={async () => {
+                        setIsGrading(true);
+                        try {
+                          const token = localStorage.getItem("token");
+                          const res = await fetch(`http://127.0.0.1:8000/results/${selectedAttempt.id}/grade`, {
+                            method: "PUT",
+                            headers: {
+                              "Content-Type": "application/json",
+                              "Authorization": `Bearer ${token}`
+                            },
+                            body: JSON.stringify({
+                              feedback: selectedAttempt.feedback || {},
+                              answers: selectedAttempt.answers || {}
+                            })
+                          });
+
+                          if (res.ok) {
+                            alert("GRADING SUCCESS: Data synced to student portal.");
+                            setShowGradingModal(false);
+                            setSelectedAttempt(null);
+                            fetchAllResults(); // Refresh list
+                          } else {
+                            alert("GRADNG ERROR: Server rejected the payload.");
+                          }
+                        } catch (err) {
+                          alert("NETWORK ERROR: Connection failed.");
+                        } finally {
+                          setIsGrading(false);
+                        }
+                      }}
+                    >
+                      {isGrading ? "Processing..." : "Submit Marking"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
+          }
+
+          {
+            showEditQuestion && editingQuestion && (
+              <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[200] p-4 overflow-y-auto">
+                <div className="modal-content p-8 rounded-2xl w-full max-w-6xl shadow-2xl my-8 relative flex flex-col lg:flex-row gap-12">
+                  <button className="absolute top-6 right-6 text-slate-400 hover:text-slate-900 dark:hover:text-white transition" onClick={() => setShowEditQuestion(false)}><X size={24} /></button>
+
+                  {/* Editor Side */}
+                  <div className="flex-1 flex flex-col gap-6">
+                    <div className="flex items-center gap-4 mb-2">
+                      <div className="p-3 bg-amber-500 rounded-2xl text-white shadow-lg shadow-amber-500/20">
+                        <Pencil size={24} />
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-bold">Edit Question</h2>
+                        <p className="text-sm text-slate-500">{selectedQuiz?.title} • ID: {editingQuestion.id}</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-xs font-black uppercase tracking-widest text-indigo-500 mb-2 block">Question Text</label>
+                        <textarea
+                          placeholder="Enter the main question text here..."
+                          className="w-full input-field p-6 rounded-2xl h-40 resize-none font-medium text-lg leading-relaxed"
+                          value={editingQuestion.text}
+                          onChange={(e) => setEditingQuestion({ ...editingQuestion, text: e.target.value })}
+                          required
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {['a', 'b', 'c', 'd'].map((label) => (
+                          <div key={label}>
+                            <label className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2 block">Option {label.toUpperCase()}</label>
+                            <input
+                              type="text"
+                              className="w-full input-field p-4 rounded-xl font-medium"
+                              value={editingQuestion[`option_${label}`]}
+                              onChange={(e) => setEditingQuestion({ ...editingQuestion, [`option_${label}`]: e.target.value })}
+                              required
+                            />
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex flex-col md:flex-row gap-6 mt-4">
+                        <div className="flex-1">
+                          <label className="text-xs font-black uppercase tracking-widest text-indigo-500 mb-2 block">Correct Answer</label>
+                          <div className="grid grid-cols-4 gap-2 p-1.5 bg-slate-900/50 rounded-2xl border border-slate-800">
+                            {['a', 'b', 'c', 'd'].map(opt => (
+                              <button
+                                key={opt}
+                                type="button"
+                                className={`py-3 rounded-xl font-black transition-all ${editingQuestion.correct_option === opt
+                                  ? 'bg-indigo-600 text-white shadow-lg'
+                                  : 'text-slate-500 hover:text-white hover:bg-slate-800'
+                                  }`}
+                                onClick={() => setEditingQuestion({ ...editingQuestion, correct_option: opt })}
+                              >
+                                {opt.toUpperCase()}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="w-full md:w-32">
+                          <label className="text-xs font-black uppercase tracking-widest text-indigo-500 mb-2 block">Points</label>
+                          <input
+                            type="number"
+                            className="w-full input-field p-4 rounded-2xl text-center font-black"
+                            value={editingQuestion.point_value}
+                            onChange={(e) => setEditingQuestion({ ...editingQuestion, point_value: parseInt(e.target.value) || 0 })}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex gap-4 pt-6">
+                        <button type="button" className="flex-1 btn-secondary py-4 rounded-2xl font-bold" onClick={() => setShowEditQuestion(false)}>Cancel</button>
+                        <button type="button" className="flex-1 bg-amber-500 text-white py-4 rounded-2xl font-bold shadow-lg shadow-amber-500/20" onClick={handleUpdateQuestion}>Update Question</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Preview Side */}
+                  <div className="hidden lg:flex lg:w-96 flex-col">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Live Preview</h3>
+                      <span className="text-[10px] text-slate-500 italic flex items-center gap-1"><Eye size={12} /> Editing</span>
+                    </div>
+                    <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-10 shadow-inner relative overflow-hidden flex-1 flex items-center justify-center">
+                      <div className="w-full bg-slate-800 p-8 rounded-[2rem] shadow-2xl border border-slate-700 relative">
+                        <div className="absolute -top-3 -left-3 w-10 h-10 bg-amber-500 text-white rounded-xl flex items-center justify-center font-black shadow-lg">!</div>
+                        <div className="absolute top-4 right-6 text-[10px] font-black uppercase text-slate-500 tracking-tighter">{editingQuestion.point_value || 1} Points</div>
+                        <p className={`text-xl font-bold mb-8 leading-relaxed ${!editingQuestion.text ? 'opacity-20 italic' : ''}`}>
+                          {editingQuestion.text || "Type your question..."}
+                        </p>
+                        <div className="space-y-3">
+                          {['a', 'b', 'c', 'd'].map(label => (
+                            <div key={label} className={`p-4 rounded-xl border flex items-center gap-3 transition-all ${editingQuestion.correct_option === label
+                              ? 'border-green-500/50 bg-green-500/5'
+                              : 'border-slate-700 opacity-40'}`}>
+                              <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-black ${editingQuestion.correct_option === label
+                                ? 'bg-green-500 text-white'
+                                : 'bg-slate-700 text-slate-500'}`}>
+                                {label.toUpperCase()}
+                              </div>
+                              <span className={`text-sm font-semibold ${editingQuestion.correct_option === label ? 'text-green-400' : 'text-slate-500'}`}>
+                                {editingQuestion[`option_${label}`] || `Option ${label.toUpperCase()}`}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          }
+
+          {
+            showEditCourse && selectedCourse && (
+              <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[200] p-4">
+                <div className="modal-content p-8 rounded-2xl w-full max-w-lg shadow-2xl">
+                  <h2 className="text-2xl font-bold mb-6">Edit Course</h2>
+                  <form onSubmit={handleUpdateCourse} className="flex flex-col gap-4">
+                    <div>
+                      <label className="text-sm font-bold text-slate-500 dark:text-gray-400">Course Title</label>
+                      <input
+                        type="text"
+                        className="w-full input-field p-3 rounded-xl"
+                        value={selectedCourse.title}
+                        onChange={(e) => setSelectedCourse({ ...selectedCourse, title: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-bold text-slate-500 dark:text-gray-400">Subject</label>
+                      <input
+                        type="text"
+                        className="w-full input-field p-3 rounded-xl"
+                        value={selectedCourse.subject}
+                        onChange={(e) => setSelectedCourse({ ...selectedCourse, subject: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-bold text-slate-500 dark:text-gray-400">Access Key</label>
+                      <input
+                        type="text"
+                        className="w-full input-field p-3 rounded-xl text-indigo-600 dark:text-indigo-400 font-bold"
+                        value={selectedCourse.access_key}
+                        onChange={(e) => setSelectedCourse({ ...selectedCourse, access_key: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="flex gap-4 mt-4">
+                      <button type="button" className="flex-1 btn-secondary p-3 rounded-xl font-semibold" onClick={() => setShowEditCourse(false)}>Cancel</button>
+                      <button type="submit" className="flex-1 btn-primary p-3 rounded-xl font-semibold">Update Course</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )
+          }
+          {
+            showEditQuiz && editingQuiz && (
+              <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[200] p-4 overflow-y-auto">
+                <div className="modal-content p-8 rounded-2xl w-full max-w-2xl shadow-2xl my-8">
+                  <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+                    <Pencil className="text-indigo-500" />
+                    Edit Quiz: {editingQuiz.title}
+                  </h2>
+                  <form onSubmit={handleUpdateQuiz} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="md:col-span-2">
+                      <label className="text-sm text-gray-400 mb-1 block">Quiz Title</label>
+                      <input
+                        type="text"
+                        className="w-full input-field p-3 rounded-xl"
+                        value={editingQuiz.title}
+                        onChange={(e) => setEditingQuiz({ ...editingQuiz, title: e.target.value })}
+                        required
+                      />
+                    </div>
+
+
+                    <div className="md:col-span-2">
+                      <label className="text-sm text-gray-400 mb-1 block">Description</label>
+                      <textarea
+                        className="w-full input-field p-3 rounded-xl h-20"
+                        value={editingQuiz.description}
+                        onChange={(e) => setEditingQuiz({ ...editingQuiz, description: e.target.value })}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm text-gray-400 mb-1 block flex items-center gap-1">
+                        <Calendar size={14} /> Start Time
+                      </label>
+                      <input
+                        type="datetime-local"
+                        className="w-full input-field p-3 rounded-xl"
+                        value={editingQuiz.start_time}
+                        onChange={(e) => setEditingQuiz({ ...editingQuiz, start_time: e.target.value })}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm text-gray-400 mb-1 block flex items-center gap-1">
+                        <Clock size={14} /> End Time
+                      </label>
+                      <input
+                        type="datetime-local"
+                        className="w-full input-field p-3 rounded-xl"
+                        value={editingQuiz.end_time}
+                        onChange={(e) => setEditingQuiz({ ...editingQuiz, end_time: e.target.value })}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm text-gray-400 mb-1 block">Duration (Minutes)</label>
+                      <input
+                        type="number"
+                        className="w-full input-field p-3 rounded-xl"
+                        value={editingQuiz.duration}
+                        onChange={(e) => setEditingQuiz({ ...editingQuiz, duration: parseInt(e.target.value) || 0 })}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm text-gray-400 mb-1 block flex items-center gap-1">
+                        <Key size={14} /> Access Key
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full input-field p-3 rounded-xl"
+                        value={editingQuiz.access_key}
+                        onChange={(e) => setEditingQuiz({ ...editingQuiz, access_key: e.target.value })}
+                        required
+                      />
+                    </div>
+
+
+                    <div>
+                      <label className="text-sm text-gray-400 mb-1 block">Violation Limit</label>
+                      <input
+                        type="number"
+                        className="w-full input-field p-3 rounded-xl"
+                        value={editingQuiz.violation_limit || 5}
+                        onChange={(e) => setEditingQuiz({ ...editingQuiz, violation_limit: parseInt(e.target.value) || 5 })}
+                      />
+                    </div>
+
+                    <div className="md:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
+                      <div className="flex flex-col gap-2">
+                        <label className="text-xs text-gray-500 font-bold">Eye Tracking</label>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input type="checkbox" className="sr-only peer" checked={editingQuiz.eye_tracking_enabled} onChange={(e) => setEditingQuiz({ ...editingQuiz, eye_tracking_enabled: e.target.checked })} />
+                          <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-600"></div>
+                        </label>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <label className="text-xs text-gray-500 font-bold">Shuffle Questions</label>
+                        <input
+                          type="checkbox"
+                          checked={editingQuiz.shuffle_questions}
+                          onChange={(e) => setEditingQuiz({ ...editingQuiz, shuffle_questions: e.target.checked })}
+                          className="w-4 h-4 rounded text-indigo-600"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <label className="text-xs text-gray-500 font-bold">Fullscreen</label>
+                        <input
+                          type="checkbox"
+                          checked={editingQuiz.fullscreen_required}
+                          onChange={(e) => setEditingQuiz({ ...editingQuiz, fullscreen_required: e.target.checked })}
+                          className="w-4 h-4 rounded text-indigo-600"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <label className="text-xs text-gray-500 font-bold">Tab Security</label>
+                        <input
+                          type="checkbox"
+                          checked={editingQuiz.tab_switch_detection}
+                          onChange={(e) => setEditingQuiz({ ...editingQuiz, tab_switch_detection: e.target.checked })}
+                          className="w-4 h-4 rounded text-indigo-600"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="md:col-span-2 flex gap-4 mt-4">
+                      <button
+                        type="button"
+                        className="flex-1 btn-secondary py-3 rounded-2xl font-bold"
+                        onClick={() => setShowEditQuiz(false)}
+                      >
+                        CANCEL
+                      </button>
+                      <button
+                        type="submit"
+                        className="flex-1 btn-primary py-3 rounded-2xl font-bold shadow-lg shadow-indigo-600/20"
+                      >
+                        SAVE CHANGES
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div >
+            )
+          }
+          {/* Create Quiz Modal */}
+          {
+            showCreateQuiz && (
+              <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[200] p-4 overflow-y-auto">
+                <div className="modal-content p-8 rounded-2xl w-full max-w-2xl shadow-2xl my-8">
+                  <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+                    <PlusCircle className="text-indigo-500" />
+                    Configure New Quiz
+                  </h2>
+                  <form onSubmit={handleCreateQuiz} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="md:col-span-2">
+                      <label className="text-sm text-gray-400 mb-1 block">Quiz Title</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Midterm Examination"
+                        className="w-full input-field p-3 rounded-xl"
+                        value={newQuiz.title}
+                        onChange={(e) => setNewQuiz({ ...newQuiz, title: e.target.value })}
+                        required
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="text-sm text-gray-400 mb-1 block">Description</label>
+                      <textarea
+                        placeholder="Instructions for students..."
+                        className="w-full input-field p-3 rounded-xl h-20"
+                        value={newQuiz.description}
+                        onChange={(e) => setNewQuiz({ ...newQuiz, description: e.target.value })}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm text-gray-400 mb-1 block flex items-center gap-1">
+                        <Calendar size={14} /> Start Time
+                      </label>
+                      <input
+                        type="datetime-local"
+                        className="w-full input-field p-3 rounded-xl"
+                        value={newQuiz.start_time}
+                        onChange={(e) => setNewQuiz({ ...newQuiz, start_time: e.target.value })}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm text-gray-400 mb-1 block flex items-center gap-1">
+                        <Clock size={14} /> End Time
+                      </label>
+                      <input
+                        type="datetime-local"
+                        className="w-full input-field p-3 rounded-xl"
+                        value={newQuiz.end_time}
+                        onChange={(e) => setNewQuiz({ ...newQuiz, end_time: e.target.value })}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm text-gray-400 mb-1 block">Duration (Minutes)</label>
+                      <input
+                        type="number"
+                        className="w-full input-field p-3 rounded-xl"
+                        value={newQuiz.duration}
+                        onChange={(e) => setNewQuiz({ ...newQuiz, duration: parseInt(e.target.value) || 0 })}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm text-gray-400 mb-1 block">Violation Limit</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 5"
+                        className="w-full input-field p-3 rounded-xl"
+                        value={newQuiz.violation_limit || 5}
+                        onChange={(e) => setNewQuiz({ ...newQuiz, violation_limit: parseInt(e.target.value) || 5 })}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm text-gray-400 mb-1 block flex items-center gap-1">
+                        <Key size={14} /> Access Key
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="QUIZ123"
+                        className="w-full input-field p-3 rounded-xl"
+                        value={newQuiz.access_key}
+                        onChange={(e) => setNewQuiz({ ...newQuiz, access_key: e.target.value })}
+                        required
+                      />
+                    </div>
+
+                    <div className="md:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
+                      <div className="flex flex-col gap-2">
+                        <label className="text-xs text-gray-500 font-bold">Eye Tracking</label>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input type="checkbox" className="sr-only peer" checked={newQuiz.eye_tracking_enabled} onChange={(e) => setNewQuiz({ ...newQuiz, eye_tracking_enabled: e.target.checked })} />
+                          <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-600"></div>
+                        </label>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <label className="text-xs text-gray-500 font-bold">Shuffle Questions</label>
+                        <input
+                          type="checkbox"
+                          checked={newQuiz.shuffle_questions}
+                          onChange={(e) => setNewQuiz({ ...newQuiz, shuffle_questions: e.target.checked })}
+                          className="w-4 h-4 rounded text-indigo-600"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <label className="text-xs text-gray-500 font-bold">Fullscreen Req.</label>
+                        <input
+                          type="checkbox"
+                          checked={newQuiz.fullscreen_required}
+                          onChange={(e) => setNewQuiz({ ...newQuiz, fullscreen_required: e.target.checked })}
+                          className="w-4 h-4 rounded text-indigo-600"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <label className="text-xs text-gray-500 font-bold">Tab Security</label>
+                        <input
+                          type="checkbox"
+                          checked={newQuiz.tab_switch_detection}
+                          onChange={(e) => setNewQuiz({ ...newQuiz, tab_switch_detection: e.target.checked })}
+                          className="w-4 h-4 rounded text-indigo-600"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="md:col-span-2 flex gap-4 mt-8">
+                      <button
+                        type="button"
+                        className="flex-1 btn-secondary py-4 rounded-2xl font-bold"
+                        onClick={() => setShowCreateQuiz(false)}
+                      >
+                        DISCARD
+                      </button>
+                      <button
+                        type="submit"
+                        className="flex-3 btn-primary py-4 rounded-2xl font-bold shadow-lg shadow-indigo-600/20"
+                      >
+                        CREATE QUIZ
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )
+          }
         </div>
-      )}
-
-      {showEditCourse && selectedCourse && (
-        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[200] p-4">
-          <div className="modal-content p-8 rounded-2xl w-full max-w-lg shadow-2xl">
-            <h2 className="text-2xl font-bold mb-6">Edit Course</h2>
-            <form onSubmit={handleUpdateCourse} className="flex flex-col gap-4">
-              <div>
-                <label className="text-sm font-bold text-slate-500 dark:text-gray-400">Course Title</label>
-                <input
-                  type="text"
-                  className="w-full input-field p-3 rounded-xl"
-                  value={selectedCourse.title}
-                  onChange={(e) => setSelectedCourse({ ...selectedCourse, title: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <label className="text-sm font-bold text-slate-500 dark:text-gray-400">Subject</label>
-                <input
-                  type="text"
-                  className="w-full input-field p-3 rounded-xl"
-                  value={selectedCourse.subject}
-                  onChange={(e) => setSelectedCourse({ ...selectedCourse, subject: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <label className="text-sm font-bold text-slate-500 dark:text-gray-400">Access Key</label>
-                <input
-                  type="text"
-                  className="w-full input-field p-3 rounded-xl text-indigo-600 dark:text-indigo-400 font-bold"
-                  value={selectedCourse.access_key}
-                  onChange={(e) => setSelectedCourse({ ...selectedCourse, access_key: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="flex gap-4 mt-4">
-                <button type="button" className="flex-1 btn-secondary p-3 rounded-xl font-semibold" onClick={() => setShowEditCourse(false)}>Cancel</button>
-                <button type="submit" className="flex-1 btn-primary p-3 rounded-xl font-semibold">Update Course</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {showEditQuiz && editingQuiz && (
-        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[200] p-4 overflow-y-auto">
-          <div className="modal-content p-8 rounded-2xl w-full max-w-2xl shadow-2xl my-8">
-            <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-              <Pencil className="text-indigo-500" />
-              Edit Quiz: {editingQuiz.title}
-            </h2>
-            <form onSubmit={handleUpdateQuiz} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="md:col-span-2">
-                <label className="text-sm text-gray-400 mb-1 block">Quiz Title</label>
-                <input
-                  type="text"
-                  className="w-full input-field p-3 rounded-xl"
-                  value={editingQuiz.title}
-                  onChange={(e) => setEditingQuiz({ ...editingQuiz, title: e.target.value })}
-                  required
-                />
-              </div>
-
-
-              <div className="md:col-span-2">
-                <label className="text-sm text-gray-400 mb-1 block">Description</label>
-                <textarea
-                  className="w-full input-field p-3 rounded-xl h-20"
-                  value={editingQuiz.description}
-                  onChange={(e) => setEditingQuiz({ ...editingQuiz, description: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-sm text-gray-400 mb-1 block flex items-center gap-1">
-                  <Calendar size={14} /> Start Time
-                </label>
-                <input
-                  type="datetime-local"
-                  className="w-full input-field p-3 rounded-xl"
-                  value={editingQuiz.start_time}
-                  onChange={(e) => setEditingQuiz({ ...editingQuiz, start_time: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-sm text-gray-400 mb-1 block flex items-center gap-1">
-                  <Clock size={14} /> End Time
-                </label>
-                <input
-                  type="datetime-local"
-                  className="w-full input-field p-3 rounded-xl"
-                  value={editingQuiz.end_time}
-                  onChange={(e) => setEditingQuiz({ ...editingQuiz, end_time: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-sm text-gray-400 mb-1 block">Duration (Minutes)</label>
-                <input
-                  type="number"
-                  className="w-full input-field p-3 rounded-xl"
-                  value={editingQuiz.duration}
-                  onChange={(e) => setEditingQuiz({ ...editingQuiz, duration: parseInt(e.target.value) || 0 })}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-sm text-gray-400 mb-1 block flex items-center gap-1">
-                  <Key size={14} /> Access Key
-                </label>
-                <input
-                  type="text"
-                  className="w-full input-field p-3 rounded-xl"
-                  value={editingQuiz.access_key}
-                  onChange={(e) => setEditingQuiz({ ...editingQuiz, access_key: e.target.value })}
-                  required
-                />
-              </div>
-
-
-              <div>
-                <label className="text-sm text-gray-400 mb-1 block">Violation Limit</label>
-                <input
-                  type="number"
-                  className="w-full input-field p-3 rounded-xl"
-                  value={editingQuiz.violation_limit || 5}
-                  onChange={(e) => setEditingQuiz({ ...editingQuiz, violation_limit: parseInt(e.target.value) || 5 })}
-                />
-              </div>
-
-              <div className="md:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs text-gray-500 font-bold">Eye Tracking</label>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" checked={editingQuiz.eye_tracking_enabled} onChange={(e) => setEditingQuiz({ ...editingQuiz, eye_tracking_enabled: e.target.checked })} />
-                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-600"></div>
-                  </label>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs text-gray-500 font-bold">Shuffle Questions</label>
-                  <input
-                    type="checkbox"
-                    checked={editingQuiz.shuffle_questions}
-                    onChange={(e) => setEditingQuiz({ ...editingQuiz, shuffle_questions: e.target.checked })}
-                    className="w-4 h-4 rounded text-indigo-600"
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs text-gray-500 font-bold">Fullscreen</label>
-                  <input
-                    type="checkbox"
-                    checked={editingQuiz.fullscreen_required}
-                    onChange={(e) => setEditingQuiz({ ...editingQuiz, fullscreen_required: e.target.checked })}
-                    className="w-4 h-4 rounded text-indigo-600"
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs text-gray-500 font-bold">Tab Security</label>
-                  <input
-                    type="checkbox"
-                    checked={editingQuiz.tab_switch_detection}
-                    onChange={(e) => setEditingQuiz({ ...editingQuiz, tab_switch_detection: e.target.checked })}
-                    className="w-4 h-4 rounded text-indigo-600"
-                  />
-                </div>
-              </div>
-
-              <div className="md:col-span-2 flex gap-4 mt-4">
-                <button
-                  type="button"
-                  className="flex-1 btn-secondary py-3 rounded-2xl font-bold"
-                  onClick={() => setShowEditQuiz(false)}
-                >
-                  CANCEL
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 btn-primary py-3 rounded-2xl font-bold shadow-lg shadow-indigo-600/20"
-                >
-                  SAVE CHANGES
-                </button>
-              </div>
-            </form>
-          </div>
-        </div >
-      )
-      }
-      {/* Create Quiz Modal */}
-      {
-        showCreateQuiz && (
-          <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[200] p-4 overflow-y-auto">
-            <div className="modal-content p-8 rounded-2xl w-full max-w-2xl shadow-2xl my-8">
-              <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                <PlusCircle className="text-indigo-500" />
-                Configure New Quiz
-              </h2>
-              <form onSubmit={handleCreateQuiz} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="md:col-span-2">
-                  <label className="text-sm text-gray-400 mb-1 block">Quiz Title</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Midterm Examination"
-                    className="w-full input-field p-3 rounded-xl"
-                    value={newQuiz.title}
-                    onChange={(e) => setNewQuiz({ ...newQuiz, title: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="text-sm text-gray-400 mb-1 block">Description</label>
-                  <textarea
-                    placeholder="Instructions for students..."
-                    className="w-full input-field p-3 rounded-xl h-20"
-                    value={newQuiz.description}
-                    onChange={(e) => setNewQuiz({ ...newQuiz, description: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm text-gray-400 mb-1 block flex items-center gap-1">
-                    <Calendar size={14} /> Start Time
-                  </label>
-                  <input
-                    type="datetime-local"
-                    className="w-full input-field p-3 rounded-xl"
-                    value={newQuiz.start_time}
-                    onChange={(e) => setNewQuiz({ ...newQuiz, start_time: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm text-gray-400 mb-1 block flex items-center gap-1">
-                    <Clock size={14} /> End Time
-                  </label>
-                  <input
-                    type="datetime-local"
-                    className="w-full input-field p-3 rounded-xl"
-                    value={newQuiz.end_time}
-                    onChange={(e) => setNewQuiz({ ...newQuiz, end_time: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm text-gray-400 mb-1 block">Duration (Minutes)</label>
-                  <input
-                    type="number"
-                    className="w-full input-field p-3 rounded-xl"
-                    value={newQuiz.duration}
-                    onChange={(e) => setNewQuiz({ ...newQuiz, duration: parseInt(e.target.value) || 0 })}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm text-gray-400 mb-1 block">Violation Limit</label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 5"
-                    className="w-full input-field p-3 rounded-xl"
-                    value={newQuiz.violation_limit || 5}
-                    onChange={(e) => setNewQuiz({ ...newQuiz, violation_limit: parseInt(e.target.value) || 5 })}
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm text-gray-400 mb-1 block flex items-center gap-1">
-                    <Key size={14} /> Access Key
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="QUIZ123"
-                    className="w-full input-field p-3 rounded-xl"
-                    value={newQuiz.access_key}
-                    onChange={(e) => setNewQuiz({ ...newQuiz, access_key: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div className="md:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs text-gray-500 font-bold">Eye Tracking</label>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" className="sr-only peer" checked={newQuiz.eye_tracking_enabled} onChange={(e) => setNewQuiz({ ...newQuiz, eye_tracking_enabled: e.target.checked })} />
-                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-600"></div>
-                    </label>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs text-gray-500 font-bold">Shuffle Questions</label>
-                    <input
-                      type="checkbox"
-                      checked={newQuiz.shuffle_questions}
-                      onChange={(e) => setNewQuiz({ ...newQuiz, shuffle_questions: e.target.checked })}
-                      className="w-4 h-4 rounded text-indigo-600"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs text-gray-500 font-bold">Fullscreen Req.</label>
-                    <input
-                      type="checkbox"
-                      checked={newQuiz.fullscreen_required}
-                      onChange={(e) => setNewQuiz({ ...newQuiz, fullscreen_required: e.target.checked })}
-                      className="w-4 h-4 rounded text-indigo-600"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs text-gray-500 font-bold">Tab Security</label>
-                    <input
-                      type="checkbox"
-                      checked={newQuiz.tab_switch_detection}
-                      onChange={(e) => setNewQuiz({ ...newQuiz, tab_switch_detection: e.target.checked })}
-                      className="w-4 h-4 rounded text-indigo-600"
-                    />
-                  </div>
-                </div>
-
-                <div className="md:col-span-2 flex gap-4 mt-8">
-                  <button
-                    type="button"
-                    className="flex-1 btn-secondary py-4 rounded-2xl font-bold"
-                    onClick={() => setShowCreateQuiz(false)}
-                  >
-                    DISCARD
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-3 btn-primary py-4 rounded-2xl font-bold shadow-lg shadow-indigo-600/20"
-                  >
-                    CREATE QUIZ
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )
-      }
-    </div >
+      </main>
+    </div>
   );
 }
 

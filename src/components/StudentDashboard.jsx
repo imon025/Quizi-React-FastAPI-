@@ -28,7 +28,9 @@ import {
   Hash,
   ArrowLeft,
   ArrowRight,
-  User
+  User,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import "./dashboard.css";
 import { useTheme } from "../context/ThemeContext";
@@ -168,6 +170,9 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
   const notificationRef = useRef(null);
   const [selectedCourseFilter, setSelectedCourseFilter] = useState('all');
   const [selectedQuizStatusFilter, setSelectedQuizStatusFilter] = useState('all');
+  const [showOldPass, setShowOldPass] = useState(false);
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
 
   useEffect(() => {
     // Fetch data from backend
@@ -929,41 +934,137 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Full Name</label>
-                        <input name="full_name" defaultValue={studentData?.full_name} className="input-field w-full p-3 rounded-xl" placeholder="Your Name" />
+                    <div className="space-y-4">
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-700 pb-2">Personal Information</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Full Name</label>
+                          <input name="full_name" defaultValue={studentData?.full_name} className="input-field w-full p-3 rounded-xl" placeholder="Your Name" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Email</label>
+                          <input name="email" defaultValue={studentData?.email} className="input-field w-full p-3 rounded-xl" placeholder="Email Address" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Mobile</label>
+                          <input name="mobile" defaultValue={studentData?.mobile} className="input-field w-full p-3 rounded-xl" placeholder="Phone Number" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Student ID</label>
+                          <input name="student_id" defaultValue={studentData?.student_id} className="input-field w-full p-3 rounded-xl" placeholder="STU-XXX" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Department</label>
+                          <input name="department" defaultValue={studentData?.department} className="input-field w-full p-3 rounded-xl" placeholder="Department" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">University</label>
+                          <input name="university" defaultValue={studentData?.university} className="input-field w-full p-3 rounded-xl" placeholder="University Name" />
+                        </div>
                       </div>
-                      <div>
-                        <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Email</label>
-                        <input name="email" defaultValue={studentData?.email} className="input-field w-full p-3 rounded-xl" placeholder="Email Address" />
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Student ID</label>
-                        <input name="student_id" defaultValue={studentData?.student_id} className="input-field w-full p-3 rounded-xl" placeholder="STU-XXX" />
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Department</label>
-                        <input name="department" defaultValue={studentData?.department} className="input-field w-full p-3 rounded-xl" placeholder="Department" />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">University</label>
-                        <input name="university" defaultValue={studentData?.university} className="input-field w-full p-3 rounded-xl" placeholder="University Name" />
-                      </div>
+                      <button type="submit" className="btn-primary w-full py-4 rounded-xl font-bold shadow-lg shadow-indigo-600/20">
+                        Update Details
+                      </button>
                     </div>
-
-                    <div className="border-t border-slate-200 dark:border-slate-700 pt-6 mt-2">
-                      <h4 className="font-bold text-slate-900 dark:text-white mb-4">Security</h4>
-                      <div>
-                        <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">New Password (Optional)</label>
-                        <input name="password" type="password" className="input-field w-full p-3 rounded-xl" placeholder="Leave empty to keep current" />
-                      </div>
-                    </div>
-
-                    <button type="submit" className="btn-primary py-4 rounded-xl font-bold shadow-lg shadow-indigo-600/20 mt-2">
-                      Save Changes
-                    </button>
                   </form>
+
+                  <div className="border-t border-slate-200 dark:border-slate-700 pt-8 mt-8">
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-700 pb-2 mb-4">Security & Password</h4>
+                    <form onSubmit={async (e) => {
+                      e.preventDefault();
+                      const formData = new FormData(e.target);
+                      const data = Object.fromEntries(formData.entries());
+
+                      if (data.new_password !== data.confirm_new_password) {
+                        alert("New passwords do not match!");
+                        return;
+                      }
+
+                      try {
+                        const token = localStorage.getItem("token");
+                        const res = await fetch("http://127.0.0.1:8000/auth/change-password", {
+                          method: "POST",
+                          headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${token}`
+                          },
+                          body: JSON.stringify(data)
+                        });
+                        if (res.ok) {
+                          alert("Password updated successfully!");
+                          e.target.reset();
+                        } else {
+                          const err = await res.json();
+                          alert("Update failed: " + (err.detail || "Unknown error"));
+                        }
+                      } catch (err) {
+                        alert("Network error");
+                      }
+                    }} className="flex flex-col gap-4">
+                      <div>
+                        <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Old Password</label>
+                        <div className="relative">
+                          <input
+                            name="old_password"
+                            type={showOldPass ? "text" : "password"}
+                            required
+                            className="input-field w-full p-3 rounded-xl"
+                            placeholder="••••••••"
+                          />
+                          <button
+                            type="button"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition"
+                            onClick={() => setShowOldPass(!showOldPass)}
+                          >
+                            {showOldPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">New Password</label>
+                          <div className="relative">
+                            <input
+                              name="new_password"
+                              type={showNewPass ? "text" : "password"}
+                              required
+                              className="input-field w-full p-3 rounded-xl"
+                              placeholder="••••••••"
+                            />
+                            <button
+                              type="button"
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition"
+                              onClick={() => setShowNewPass(!showNewPass)}
+                            >
+                              {showNewPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Confirm New Password</label>
+                          <div className="relative">
+                            <input
+                              name="confirm_new_password"
+                              type={showConfirmPass ? "text" : "password"}
+                              required
+                              className="input-field w-full p-3 rounded-xl"
+                              placeholder="••••••••"
+                            />
+                            <button
+                              type="button"
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition"
+                              onClick={() => setShowConfirmPass(!showConfirmPass)}
+                            >
+                              {showConfirmPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <button type="submit" className="bg-slate-900 dark:bg-indigo-600 text-white py-4 rounded-xl font-bold shadow-lg hover:opacity-90 transition">
+                        Change Password
+                      </button>
+                    </form>
+                  </div>
                 </div>
               </div>
             )
@@ -974,7 +1075,7 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
             )
           }
         </div>
-      </main>
+      </main >
 
       {/* Enrollment Key Modal */}
       {
