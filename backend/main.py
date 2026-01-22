@@ -196,24 +196,35 @@ def create_course(course: schemas.CourseCreate, current_user: models.User = Depe
 
 @app.get("/courses", response_model=List[schemas.CourseResponse])
 def get_courses(db: Session = Depends(get_db)):
-    return db.query(models.Course).all()
+    courses = db.query(models.Course).all()
+    for c in courses:
+        c.quiz_count = len(c.quizzes)
+    return courses
 
 @app.get("/courses/all", response_model=List[schemas.CourseResponse])
 def get_all_courses(db: Session = Depends(get_db)):
-    return db.query(models.Course).all()
+    courses = db.query(models.Course).all()
+    for c in courses:
+        c.quiz_count = len(c.quizzes)
+    return courses
 
 @app.get("/courses/my", response_model=List[schemas.CourseResponse])
 def get_my_courses(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     if current_user.user_type == 1: # Teacher
-        return current_user.taught_courses
+        courses = current_user.taught_courses
     else: # Student
-        return [enrollment.course for enrollment in current_user.enrollments]
+        courses = [enrollment.course for enrollment in current_user.enrollments]
+    
+    for c in courses:
+        c.quiz_count = len(c.quizzes)
+    return courses
 
 @app.get("/courses/{course_id}", response_model=schemas.CourseResponse)
 def get_course(course_id: int, db: Session = Depends(get_db)):
     course = db.query(models.Course).filter(models.Course.id == course_id).first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
+    course.quiz_count = len(course.quizzes)
     return course
 
 @app.put("/courses/{course_id}", response_model=schemas.CourseResponse)
@@ -294,13 +305,17 @@ def create_quiz(quiz: schemas.QuizCreate, current_user: models.User = Depends(ge
     new_quiz = models.Quiz(**quiz.dict())
     db.add(new_quiz)
     
+    # Get course title safely for notification
+    course = db.query(models.Course).filter(models.Course.id == quiz.course_id).first()
+    course_title = course.title if course else "Unknown Course"
+    
     # Notify all enrolled students
     enrollments = db.query(models.Enrollment).filter_by(course_id=quiz.course_id).all()
     for enrollment in enrollments:
         notif = models.Notification(
             user_id=enrollment.student_id,
             title="New Quiz Posted!",
-            message=f"A new quiz '{quiz.title}' has been added to your course: {new_quiz.course.title}",
+            message=f"A new quiz '{quiz.title}' has been added to your course: {course_title}",
             type="quiz"
         )
         db.add(notif)
@@ -328,12 +343,13 @@ def update_quiz(quiz_id: int, quiz_update: schemas.QuizBase, current_user: model
     db.commit()
     
     # Notify all enrolled students
+    course_title = quiz.course.title if quiz.course else "Unknown Course"
     enrollments = db.query(models.Enrollment).filter_by(course_id=quiz.course_id).all()
     for enrollment in enrollments:
         notif = models.Notification(
             user_id=enrollment.student_id,
             title="Quiz Updated",
-            message=f"The quiz '{quiz.title}' in course '{quiz.course.title}' has been updated.",
+            message=f"The quiz '{quiz.title}' in course '{course_title}' has been updated.",
             type="quiz"
         )
         db.add(notif)

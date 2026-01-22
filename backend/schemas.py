@@ -74,6 +74,7 @@ class CourseResponse(CourseBase):
     id: int
     teacher_id: int
     created_at: datetime
+    quiz_count: int = 0
     
     class Config:
         from_attributes = True
@@ -82,8 +83,8 @@ class CourseResponse(CourseBase):
 class QuizBase(BaseModel):
     title: str
     description: str
-    start_time: datetime
-    end_time: datetime
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
     duration: int
     deadline: Optional[datetime] = None
     passing_marks: int

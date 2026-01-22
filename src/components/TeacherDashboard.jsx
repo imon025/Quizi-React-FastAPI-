@@ -224,6 +224,8 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
   const [showOldPass, setShowOldPass] = useState(false);
   const [showNewPass, setShowNewPass] = useState(false);
   const [showConfirmPass, setShowConfirmPass] = useState(false);
+  const [passNew, setPassNew] = useState("");
+  const [passConfirm, setPassConfirm] = useState("");
 
   useEffect(() => {
     localStorage.setItem("teacher_selectedCourse", JSON.stringify(selectedCourse));
@@ -516,12 +518,16 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
         setActiveTab("question-management");
         setShowAddQuestion(true);
       } else {
-        const errorData = await res.json();
         let errorMessage = "Failed to create quiz";
-        if (typeof errorData.detail === 'string') {
-          errorMessage = errorData.detail;
-        } else if (Array.isArray(errorData.detail)) {
-          errorMessage = errorData.detail.map(err => `${err.loc.join('.')}: ${err.msg}`).join('\n');
+        try {
+          const errorData = await res.json();
+          if (typeof errorData.detail === 'string') {
+            errorMessage = errorData.detail;
+          } else if (Array.isArray(errorData.detail)) {
+            errorMessage = errorData.detail.map(err => `${err.loc.join('.')}: ${err.msg}`).join('\n');
+          }
+        } catch (jsonErr) {
+          errorMessage = `Server Error (Status ${res.status})`;
         }
         toast.error(`Error: ${errorMessage}`);
       }
@@ -1284,11 +1290,18 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
           {activeTab === "courses" && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {myCourses.map(course => (
-                <div key={course.id} className="chart-card flex flex-col justify-between">
+                <div
+                  key={course.id}
+                  className="chart-card flex flex-col justify-between cursor-pointer hover:border-indigo-500/50 transition-all active:scale-[0.98]"
+                  onClick={() => { setSelectedCourse(course); setActiveTab("course-detail"); }}
+                >
                   <div>
                     <div className="flex justify-between items-start mb-2">
                       <h3 className="text-xl font-bold">{course.title}</h3>
-                      <span className="text-xs bg-indigo-500/20 text-indigo-400 px-2 py-1 rounded-md font-mono">{course.course_code}</span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="text-xs bg-indigo-500/20 text-indigo-400 px-2 py-1 rounded-md font-mono">{course.course_code}</span>
+                        <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 px-2 py-0.5 rounded font-black uppercase tracking-tighter">{course.quiz_count || 0} Quizzes</span>
+                      </div>
                     </div>
                     <p className="text-gray-400 text-sm mb-4 line-clamp-2">{course.description}</p>
                     <div className="flex items-center gap-2 text-xs text-gray-500 mb-4">
@@ -1298,13 +1311,18 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                   <div className="flex gap-2">
                     <button
                       className="flex-1 btn-primary py-2 rounded-lg text-sm transition"
-                      onClick={() => { setSelectedCourse(course); setActiveTab("course-detail"); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedCourse(course);
+                        setActiveTab("course-detail");
+                      }}
                     >
                       Manage
                     </button>
                     <button
                       className="flex-1 bg-pink-600/20 text-pink-400 border border-pink-600/30 py-2 rounded-lg text-sm hover:bg-pink-600 hover:text-white transition"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         if (deleteCourseId === course.id) {
                           handleDeleteCourse(course.id);
                         } else {
@@ -2155,6 +2173,8 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                       if (res.ok) {
                         toast.success("Password updated successfully!");
                         e.target.reset();
+                        setPassNew("");
+                        setPassConfirm("");
                       } else {
                         const err = await res.json();
                         toast.error("Update failed: " + (err.detail || "Unknown error"));
@@ -2163,6 +2183,10 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                       toast.error("Network error");
                     }
                   }} className="flex flex-col gap-4">
+                    {/* Password Match visual check */}
+                    {passNew !== passConfirm && passConfirm !== "" && (
+                      <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest animate-pulse">Passwords do not match</p>
+                    )}
                     <div>
                       <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Old Password</label>
                       <div className="relative">
@@ -2190,7 +2214,9 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                             name="new_password"
                             type={showNewPass ? "text" : "password"}
                             required
-                            className="input-field w-full p-3 rounded-xl"
+                            value={passNew}
+                            onChange={(e) => setPassNew(e.target.value)}
+                            className={`input-field w-full p-3 rounded-xl transition-all duration-300 ${passNew !== passConfirm && passConfirm !== "" ? "border-red-500/50 ring-2 ring-red-500/20" : ""}`}
                             placeholder="••••••••"
                           />
                           <button
@@ -2209,7 +2235,9 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                             name="confirm_new_password"
                             type={showConfirmPass ? "text" : "password"}
                             required
-                            className="input-field w-full p-3 rounded-xl"
+                            value={passConfirm}
+                            onChange={(e) => setPassConfirm(e.target.value)}
+                            className={`input-field w-full p-3 rounded-xl transition-all duration-300 ${passNew !== passConfirm && passConfirm !== "" ? "border-red-500/50 ring-2 ring-red-500/20" : ""}`}
                             placeholder="••••••••"
                           />
                           <button

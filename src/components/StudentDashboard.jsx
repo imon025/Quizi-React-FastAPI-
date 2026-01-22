@@ -174,6 +174,8 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
   const [showOldPass, setShowOldPass] = useState(false);
   const [showNewPass, setShowNewPass] = useState(false);
   const [showConfirmPass, setShowConfirmPass] = useState(false);
+  const [passNew, setPassNew] = useState("");
+  const [passConfirm, setPassConfirm] = useState("");
 
   useEffect(() => {
     // Fetch data from backend
@@ -535,14 +537,8 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
 
             // Pending Quizzes: Check all quizzes in enrolled courses not in results
             const attemptedQuizIds = new Set(results.map(r => r.quiz_id));
-            let pendingCount = 0;
-            myCourses.forEach(course => {
-              if (course.quizzes) {
-                course.quizzes.forEach(q => {
-                  if (!attemptedQuizIds.has(q.id)) pendingCount++;
-                });
-              }
-            });
+            const totalQuizzesAcrossCourses = myCourses.reduce((acc, c) => acc + (c.quiz_count || 0), 0);
+            const pendingCount = Math.max(0, totalQuizzesAcrossCourses - attemptedQuizIds.size);
 
             // Overall Progress: Passed courses (at least one quiz passed) / Total enrolled
             // For simplicity, let's use: (courses with at least one attempt) / Total enrolled
@@ -713,27 +709,40 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
 
           {activeTab === "my-courses" && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {myCourses.map(course => (
-                <div key={course.id} className="chart-card">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="text-xl font-bold">{course.title}</h3>
-                    <span className="text-xs bg-indigo-500/20 text-indigo-400 px-2 py-1 rounded-md font-mono">{course.course_code}</span>
+              {myCourses.map(course => {
+                const courseResults = results.filter(r => r.quiz?.course_id === course.id);
+                const completedCount = courseResults.length;
+                const totalQuizzes = course.quiz_count || 0;
+                const percent = totalQuizzes > 0 ? Math.round((completedCount / totalQuizzes) * 100) : 0;
+
+                return (
+                  <div
+                    key={course.id}
+                    className="chart-card cursor-pointer hover:border-indigo-500/50 transition-all active:scale-[0.98]"
+                    onClick={() => {
+                      setSelectedCourseFilter(course.id.toString());
+                      setActiveTab("quizzes");
+                    }}
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="text-xl font-bold">{course.title}</h3>
+                      <span className="text-xs bg-indigo-500/20 text-indigo-400 px-2 py-1 rounded-md font-mono">{course.course_code}</span>
+                    </div>
+                    <p className="text-gray-400 text-sm mb-4 line-clamp-2">{course.description}</p>
+                    <div className="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                      <div className="bg-indigo-50 h-full transition-all duration-1000" style={{ width: `${percent}%`, backgroundColor: percent === 100 ? '#10b981' : '#6366f1' }}></div>
+                    </div>
+                    <div className="flex justify-between items-center mt-3">
+                      <p className={`text-xs font-medium ${percent === 100 ? 'text-green-500' : 'text-indigo-400'}`}>
+                        {percent}% Complete
+                      </p>
+                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                        {completedCount}/{totalQuizzes} Quizzes
+                      </span>
+                    </div>
                   </div>
-                  <p className="text-gray-400 text-sm mb-4 line-clamp-2">{course.description}</p>
-                  <div className="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                    <div className="bg-indigo-500 h-full w-3/4"></div>
-                  </div>
-                  <div className="flex justify-between items-center mt-3">
-                    <p className="text-xs text-indigo-400 font-medium">75% Complete</p>
-                    <button
-                      className="text-xs text-indigo-400 hover:underline"
-                      onClick={() => setActiveTab("quizzes")}
-                    >
-                      View Quizzes
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               {myCourses.length === 0 && (
                 <div className="col-span-full py-20 text-center">
                   <Layers size={48} className="mx-auto text-slate-700 mb-4" />
@@ -994,6 +1003,8 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
                         if (res.ok) {
                           toast.success("Password updated successfully!");
                           e.target.reset();
+                          setPassNew("");
+                          setPassConfirm("");
                         } else {
                           const err = await res.json();
                           toast.error("Update failed: " + (err.detail || "Unknown error"));
@@ -1002,6 +1013,10 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
                         toast.error("Network error");
                       }
                     }} className="flex flex-col gap-4">
+                      {/* Password Match visual check */}
+                      {passNew !== passConfirm && passConfirm !== "" && (
+                        <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest animate-pulse">Passwords do not match</p>
+                      )}
                       <div>
                         <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Old Password</label>
                         <div className="relative">
@@ -1029,7 +1044,9 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
                               name="new_password"
                               type={showNewPass ? "text" : "password"}
                               required
-                              className="input-field w-full p-3 rounded-xl"
+                              value={passNew}
+                              onChange={(e) => setPassNew(e.target.value)}
+                              className={`input-field w-full p-3 rounded-xl transition-all duration-300 ${passNew !== passConfirm && passConfirm !== "" ? "border-red-500/50 ring-2 ring-red-500/20" : ""}`}
                               placeholder="••••••••"
                             />
                             <button
@@ -1048,7 +1065,9 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
                               name="confirm_new_password"
                               type={showConfirmPass ? "text" : "password"}
                               required
-                              className="input-field w-full p-3 rounded-xl"
+                              value={passConfirm}
+                              onChange={(e) => setPassConfirm(e.target.value)}
+                              className={`input-field w-full p-3 rounded-xl transition-all duration-300 ${passNew !== passConfirm && passConfirm !== "" ? "border-red-500/50 ring-2 ring-red-500/20" : ""}`}
                               placeholder="••••••••"
                             />
                             <button
