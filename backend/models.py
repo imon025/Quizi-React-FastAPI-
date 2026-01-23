@@ -28,6 +28,7 @@ class User(Base):
     taught_courses = relationship("Course", back_populates="teacher")
     enrollments = relationship("Enrollment", back_populates="student")
     results = relationship("Result", back_populates="student")
+    leave_requests = relationship("LeaveRequest", back_populates="student")
 
 class Course(Base):
     __tablename__ = "courses"
@@ -48,6 +49,7 @@ class Course(Base):
     teacher = relationship("User", back_populates="taught_courses")
     quizzes = relationship("Quiz", back_populates="course")
     enrollments = relationship("Enrollment", back_populates="course")
+    leave_requests = relationship("LeaveRequest", back_populates="course")
 
 class Enrollment(Base):
     __tablename__ = "enrollments"
@@ -130,3 +132,14 @@ class Notification(Base):
     is_read = Column(Boolean, default=False)
 
     user = relationship("User", backref="notifications")
+
+class LeaveRequest(Base):
+    __tablename__ = "leave_requests"
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("users.id"))
+    course_id = Column(Integer, ForeignKey("courses.id"))
+    status = Column(String, default="pending")  # pending, accepted, declined
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    student = relationship("User", back_populates="leave_requests")
+    course = relationship("Course", back_populates="leave_requests")

@@ -33,7 +33,9 @@ import {
   ShieldAlert,
   ChevronDown,
   ChevronUp,
-  Activity
+  Activity,
+  Hash,
+  Tag
 } from "lucide-react";
 import "./dashboard.css";
 import { useTheme } from "../context/ThemeContext";
@@ -229,6 +231,7 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
   const [passConfirm, setPassConfirm] = useState("");
   const [previousTab, setPreviousTab] = useState("dashboard");
   const [profilePic, setProfilePic] = useState(teacherData.profile_picture);
+  const [leaveRequestFilter, setLeaveRequestFilter] = useState('pending');
 
   const handleProfilePictureUpload = async (e) => {
     const file = e.target.files[0];
@@ -259,6 +262,66 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
       } else {
         const error = await res.json();
         toast.error(error.detail || "Upload failed");
+      }
+    } catch (err) {
+      toast.error("Network error");
+    }
+  };
+
+  const handleDeleteProfilePicture = async () => {
+    if (!profilePic) return;
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch("http://127.0.0.1:8000/auth/profile-picture", {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+
+      if (res.ok) {
+        setProfilePic(null);
+        toast.success("Profile picture deleted!");
+      } else {
+        const error = await res.json();
+        toast.error(error.detail || "Delete failed");
+      }
+    } catch (err) {
+      toast.error("Network error");
+    }
+  };
+
+  const [leaveRequests, setLeaveRequests] = useState([]);
+  const fetchLeaveRequests = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch("http://127.0.0.1:8000/teacher/leave-requests", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setLeaveRequests(await res.json());
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  const handleProcessLeaveRequest = async (requestId, status) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`http://127.0.0.1:8000/leave-requests/${requestId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ status })
+      });
+      if (res.ok) {
+        toast.success(`Request ${status}ed successfully!`);
+        fetchLeaveRequests();
+        fetchMyStudents(); // Refresh student list as well
+      } else {
+        const error = await res.json();
+        toast.error(error.detail || "Action failed");
       }
     } catch (err) {
       toast.error("Network error");
@@ -354,7 +417,9 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
       fetchAllQuizzes();
       fetchAllResults();
       fetchMyStudents();
+      fetchLeaveRequests();
     }, 30000);
+    fetchLeaveRequests();
     return () => clearInterval(interval);
   }, []);
 
@@ -1091,6 +1156,12 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
             label="Students"
             active={activeTab === "students"}
             onClick={() => { setActiveTab("students"); setIsSidebarOpen(false); }}
+          />
+          <SidebarItem
+            icon={<ShieldAlert size={18} />}
+            label="Leave Requests"
+            active={activeTab === "leave-requests"}
+            onClick={() => { setActiveTab("leave-requests"); setIsSidebarOpen(false); }}
           />
           <SidebarItem
             icon={<FileText size={18} />}
@@ -2102,6 +2173,112 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
             </div>
           )}
 
+          {activeTab === "leave-requests" && (
+            <div className="flex flex-col gap-8 max-w-5xl mx-auto w-full">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                  <h2 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Student Leave Requests</h2>
+                  <p className="text-slate-600 dark:text-slate-400 mt-1">Manage enrollment leave requests from your students</p>
+                </div>
+
+                {/* Filter Dropdown */}
+                <div className="flex items-center gap-3 bg-white dark:bg-slate-800 p-2 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Filter Status:</span>
+                  <select
+                    value={leaveRequestFilter}
+                    onChange={(e) => setLeaveRequestFilter(e.target.value)}
+                    className="bg-transparent text-sm font-bold text-slate-700 dark:text-white outline-none pr-8 py-1 cursor-pointer"
+                  >
+                    <option value="all" className="dark:bg-slate-800 dark:text-white">All Requests</option>
+                    <option value="pending" className="dark:bg-slate-800 dark:text-white">Pending</option>
+                    <option value="accepted" className="dark:bg-slate-800 dark:text-white">Accepted</option>
+                    <option value="declined" className="dark:bg-slate-800 dark:text-white">Declined</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-6">
+                {leaveRequests.filter(r => leaveRequestFilter === 'all' || r.status === leaveRequestFilter).length > 0 ? (
+                  leaveRequests.filter(r => leaveRequestFilter === 'all' || r.status === leaveRequestFilter).map(req => (
+                    <div key={req.id} className="chart-card flex flex-col md:flex-row justify-between items-center gap-8 p-8 group border border-slate-200 dark:border-slate-800 hover:border-indigo-500/30 transition-all rounded-[2.5rem] bg-white dark:bg-slate-800/40 relative overflow-hidden">
+                      {/* Status Background Accent */}
+                      <div className={`absolute top-0 left-0 w-1.5 h-full ${req.status === 'pending' ? 'bg-amber-500' : req.status === 'accepted' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+
+                      <div className="flex items-center gap-6 flex-1">
+                        <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-2xl font-bold text-white shadow-lg overflow-hidden border-2 border-white dark:border-slate-700 shrink-0">
+                          {req.student?.profile_picture ? (
+                            <img src={req.student.profile_picture} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            req.student?.full_name?.charAt(0)
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3">
+                            <h4 className="text-xl font-black text-slate-900 dark:text-white">{req.student?.full_name}</h4>
+                            <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full border ${req.status === 'pending' ? 'bg-amber-500/10 text-amber-500 border-amber-500/10' : req.status === 'accepted' ? 'bg-green-500/10 text-green-500 border-green-500/10' : 'bg-red-500/10 text-red-500 border-red-500/10'}`}>
+                              {req.status}
+                            </span>
+                          </div>
+                          <p className="text-sm text-indigo-400 font-bold mt-1">{req.course?.title}</p>
+
+                          {/* Student Details Row */}
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-y-2 gap-x-6 mt-4 pt-4 border-t border-slate-100 dark:border-slate-700/50">
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Student ID</p>
+                              <p className="text-xs font-bold text-slate-600 dark:text-slate-300">#{req.student?.student_id}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Quizzes Attempted</p>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-xs font-bold ${req.quiz_attempts_count > 0 ? 'text-indigo-500' : 'text-slate-400'}`}>
+                                  {req.quiz_attempts_count} Attempts
+                                </span>
+                              </div>
+                            </div>
+                            <div className="hidden md:block">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Request Date</p>
+                              <p className="text-xs font-bold text-slate-600 dark:text-slate-300">{new Date(req.created_at).toLocaleDateString()}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-row md:flex-col gap-3 w-full md:w-48">
+                        {req.status === 'pending' ? (
+                          <>
+                            <button
+                              onClick={() => handleProcessLeaveRequest(req.id, 'accepted')}
+                              className="flex-1 btn-primary bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-green-900/10 flex items-center justify-center gap-2 transition-transform active:scale-95"
+                            >
+                              <CheckCircle size={18} /> Accept
+                            </button>
+                            <button
+                              onClick={() => handleProcessLeaveRequest(req.id, 'declined')}
+                              className="flex-1 btn-secondary border-red-500/30 text-red-500 hover:bg-red-500/5 px-6 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 transition-transform active:scale-95"
+                            >
+                              <X size={18} /> Decline
+                            </button>
+                          </>
+                        ) : (
+                          <div className="w-full py-4 text-center rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-700/50">
+                            <p className="text-xs font-black uppercase tracking-widest text-slate-400">Process Completed</p>
+                            <p className="text-[10px] text-slate-500 mt-1 font-medium italic">Handled on {new Date(req.created_at).toLocaleDateString()}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-24 text-center bg-slate-50 dark:bg-slate-800/10 rounded-[3rem] border-2 border-dashed border-slate-200 dark:border-slate-800/50">
+                    <Users size={48} className="mx-auto mb-4 text-slate-300 dark:text-slate-700" />
+                    <p className="text-xl font-bold text-slate-400">No {leaveRequestFilter !== 'all' ? leaveRequestFilter : ''} leave requests found</p>
+                    <p className="text-sm text-slate-400 mt-2">Try changing the filter or wait for students to submit requests.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {activeTab === "profile" && (
             <div className="max-w-2xl mx-auto w-full">
               <div className="flex justify-between items-center mb-6">
@@ -2145,19 +2322,31 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                   }
                 }} className="flex flex-col gap-6">
 
-                  <div className="flex items-center gap-4 mb-4">
-                    <div
-                      className="w-20 h-20 bg-indigo-600 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-lg shadow-indigo-600/20 cursor-pointer overflow-hidden group relative"
-                      onClick={() => fileInputRef.current.click()}
-                    >
-                      {profilePic ? (
-                        <img src={profilePic} alt="Profile" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
-                      ) : (
-                        teacherData.full_name?.charAt(0)
-                      )}
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Pencil size={20} className="text-white" />
+                  <div className="flex flex-col items-center gap-2 mb-4">
+                    <div className="relative group">
+                      <div
+                        className="w-24 h-24 bg-indigo-600 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-lg shadow-indigo-600/20 cursor-pointer overflow-hidden relative"
+                        onClick={() => fileInputRef.current.click()}
+                      >
+                        {profilePic ? (
+                          <img src={profilePic} alt="Profile" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                        ) : (
+                          teacherData.full_name?.charAt(0)
+                        )}
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Pencil size={20} className="text-white" />
+                        </div>
                       </div>
+                      {profilePic && (
+                        <button
+                          type="button"
+                          onClick={handleDeleteProfilePicture}
+                          className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-red-500 text-white p-1.5 rounded-full shadow-lg hover:bg-red-600 transition-all z-10 scale-90 group-hover:scale-100"
+                          title="Delete Profile Picture"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      )}
                     </div>
                     <input
                       type="file"
@@ -2166,8 +2355,10 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                       accept="image/*"
                       onChange={handleProfilePictureUpload}
                     />
-                    <div>
-                      <h3 className="text-xl font-bold">{teacherData.full_name}</h3>
+                    <div className="text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <h3 className="text-xl font-bold">{teacherData.full_name}</h3>
+                      </div>
                       <p className="text-slate-500 text-sm">{teacherData.email}</p>
                       <span className="inline-block mt-1 px-2 py-0.5 bg-indigo-500/10 text-indigo-500 text-[10px] font-bold uppercase tracking-wider rounded">Teacher Account</span>
                     </div>

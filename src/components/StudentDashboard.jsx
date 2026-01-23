@@ -31,7 +31,8 @@ import {
   User,
   Eye,
   EyeOff,
-  Pencil
+  Pencil,
+  Trash2
 } from "lucide-react";
 import "./dashboard.css";
 import { useTheme } from "../context/ThemeContext";
@@ -182,6 +183,20 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
   const [profilePic, setProfilePic] = useState(studentData.profile_picture);
   const [showQuizDetailsModal, setShowQuizDetailsModal] = useState(false);
   const [selectedQuizForDetails, setSelectedQuizForDetails] = useState(null);
+  const [leavingCourseId, setLeavingCourseId] = useState(null);
+  const [leaveCountdown, setLeaveCountdown] = useState(0);
+
+  useEffect(() => {
+    let timer;
+    if (leavingCourseId && leaveCountdown > 0) {
+      timer = setInterval(() => {
+        setLeaveCountdown(prev => prev - 1);
+      }, 1000);
+    } else if (leaveCountdown === 0 && leavingCourseId) {
+      // Countdown finished
+    }
+    return () => clearInterval(timer);
+  }, [leavingCourseId, leaveCountdown]);
 
   const handleProfilePictureUpload = async (e) => {
     const file = e.target.files[0];
@@ -212,6 +227,49 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
       } else {
         const error = await res.json();
         toast.error(error.detail || "Upload failed");
+      }
+    } catch (err) {
+      toast.error("Network error");
+    }
+  };
+
+  const handleDeleteProfilePicture = async () => {
+    if (!profilePic) return;
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch("http://127.0.0.1:8000/auth/profile-picture", {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+
+      if (res.ok) {
+        setProfilePic(null);
+        toast.success("Profile picture deleted!");
+      } else {
+        const error = await res.json();
+        toast.error(error.detail || "Delete failed");
+      }
+    } catch (err) {
+      toast.error("Network error");
+    }
+  };
+
+  const handleRequestLeave = async (courseId) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`http://127.0.0.1:8000/courses/${courseId}/leave-request`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || "Leave request submitted!");
+      } else {
+        toast.error(data.detail || "Request failed");
       }
     } catch (err) {
       toast.error("Network error");
@@ -504,7 +562,7 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
                   className="p-3 btn-secondary rounded-xl relative"
                   onClick={() => setShowNotifications(!showNotifications)}
                 >
-                  <Bell size={20} className={notifications.some(n => !n.is_read) ? "text-indigo-500" : "text-gray-500"} />
+                  <Bell size={20} className={notifications.some(n => !n.is_read) ? "text-indigo-500" : "text-white"} />
                   {notifications.some(n => !n.is_read) && (
                     <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-900 animate-pulse"></span>
                   )}
@@ -782,6 +840,52 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
                       <p className={`text-xs font-medium ${percent === 100 ? 'text-green-500' : 'text-indigo-400'}`}>
                         {percent}% Complete
                       </p>
+                      {leavingCourseId === course.id ? (
+                        <div className="flex items-center gap-2">
+                          {leaveCountdown > 0 ? (
+                            <button
+                              disabled
+                              className="px-4 py-2 bg-red-500/10 text-red-500 rounded-xl font-bold text-xs flex items-center gap-2 animate-pulse"
+                            >
+                              Confirm in {leaveCountdown}s
+                            </button>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRequestLeave(course.id);
+                                setLeavingCourseId(null);
+                              }}
+                              className="px-4 py-2 bg-red-600 text-white rounded-xl font-bold text-xs hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 active:scale-95"
+                            >
+                              Confirm Leave
+                            </button>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setLeavingCourseId(null);
+                              setLeaveCountdown(0);
+                            }}
+                            className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
+                            title="Cancel"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLeavingCourseId(course.id);
+                            setLeaveCountdown(5);
+                          }}
+                          className="px-4 py-2 text-red-500 hover:bg-red-500/10 border border-red-500/20 rounded-xl transition-all flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider group/leave shadow-sm"
+                          title="Leave Course Request"
+                        >
+                          <LogOut size={12} className="group-hover/leave:-translate-x-0.5 transition-transform" /> Leave
+                        </button>
+                      )}
                       <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
                         {completedCount}/{totalQuizzes} Quizzes
                       </span>
@@ -980,19 +1084,31 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
                     }
                   }} className="flex flex-col gap-6">
 
-                    <div className="flex items-center gap-4 mb-4">
-                      <div
-                        className="w-20 h-20 bg-indigo-600 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-lg shadow-indigo-600/20 cursor-pointer overflow-hidden group relative"
-                        onClick={() => fileInputRef.current.click()}
-                      >
-                        {profilePic ? (
-                          <img src={profilePic} alt="Profile" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
-                        ) : (
-                          studentData.full_name?.charAt(0)
-                        )}
-                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Pencil size={20} className="text-white" />
+                    <div className="flex flex-col items-center gap-2 mb-4">
+                      <div className="relative group">
+                        <div
+                          className="w-24 h-24 bg-indigo-600 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-lg shadow-indigo-600/20 cursor-pointer overflow-hidden relative"
+                          onClick={() => fileInputRef.current.click()}
+                        >
+                          {profilePic ? (
+                            <img src={profilePic} alt="Profile" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                          ) : (
+                            studentData.full_name?.charAt(0)
+                          )}
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Pencil size={20} className="text-white" />
+                          </div>
                         </div>
+                        {profilePic && (
+                          <button
+                            type="button"
+                            onClick={handleDeleteProfilePicture}
+                            className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-red-500 text-white p-1.5 rounded-full shadow-lg hover:bg-red-600 transition-all z-10 scale-90 group-hover:scale-100"
+                            title="Delete Profile Picture"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
                       </div>
                       <input
                         type="file"
@@ -1001,7 +1117,7 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
                         accept="image/*"
                         onChange={handleProfilePictureUpload}
                       />
-                      <div>
+                      <div className="text-center">
                         <h3 className="text-xl font-bold">{studentData?.full_name}</h3>
                         <p className="text-slate-500 text-sm">{studentData?.email}</p>
                         <span className="inline-block mt-1 px-2 py-0.5 bg-indigo-500/10 text-indigo-500 text-[10px] font-bold uppercase tracking-wider rounded">Student Account</span>

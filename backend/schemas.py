@@ -170,3 +170,22 @@ class NotificationResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class LeaveRequestBase(BaseModel):
+    course_id: int
+
+class LeaveRequestCreate(LeaveRequestBase):
+    pass
+
+class LeaveRequestResponse(BaseModel):
+    id: int
+    student_id: int
+    course_id: int
+    status: str
+    created_at: datetime
+    student: Optional[UserResponse] = None
+    course: Optional[CourseResponse] = None
+    quiz_attempts_count: int = 0
+
+    class Config:
+        from_attributes = True

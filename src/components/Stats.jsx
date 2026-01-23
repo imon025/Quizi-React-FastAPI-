@@ -1,6 +1,6 @@
 import CountUp from "react-countup";
 
-const Stats = ({ end, title, prefix = "", suffix = "" }) => {
+const Stats = ({ end = 0, title, prefix = "", suffix = "" }) => {
   return (
     <div className="flex flex-col items-center text-center px-4">
       <h2 className="font-poppins font-semibold text-3xl md:text-4xl lg:text-[2.7rem] leading-tight dark:text-white text-slate-900">

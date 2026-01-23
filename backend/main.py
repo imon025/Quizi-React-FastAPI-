@@ -174,6 +174,25 @@ async def upload_profile_picture(
     
     return {"message": "Profile picture uploaded successfully", "url": profile_pic_url}
 
+@app.delete("/auth/profile-picture")
+async def delete_profile_picture(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.profile_picture:
+        raise HTTPException(status_code=400, detail="No profile picture to delete")
+    
+    # Optional: Delete file from filesystem if it exists locally
+    # profile_pic_url = f"http://127.0.0.1:8000/uploads/profile_pics/{filename}"
+    path_part = current_user.profile_picture.split("/uploads/")[-1]
+    full_path = os.path.join("uploads", path_part)
+    if os.path.exists(full_path):
+        os.remove(full_path)
+
+    current_user.profile_picture = None
+    db.commit()
+    return {"message": "Profile picture deleted successfully"}
+
 # --- TEACHER UTILS ---
 
 @app.get("/teacher/students")
@@ -331,6 +350,36 @@ def enroll_student(course_id: int, enrollment_data: dict, current_user: models.U
     
     db.commit()
     return {"message": "Successfully enrolled"}
+
+@app.post("/courses/{course_id}/leave-request")
+def request_to_leave_course(course_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.user_type != 0:
+        raise HTTPException(status_code=403, detail="Only students can request to leave a course")
+    
+    # Check enrollment
+    enrollment = db.query(models.Enrollment).filter_by(student_id=current_user.id, course_id=course_id).first()
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="Student not enrolled in this course")
+    
+    # Check existing request
+    existing = db.query(models.LeaveRequest).filter_by(student_id=current_user.id, course_id=course_id, status="pending").first()
+    if existing:
+        return {"message": "Leave request already pending"}
+    
+    new_request = models.LeaveRequest(student_id=current_user.id, course_id=course_id)
+    db.add(new_request)
+    
+    # Notify Teacher
+    course = db.query(models.Course).filter_by(id=course_id).first()
+    notif = models.Notification(
+        user_id=course.teacher_id,
+        title="New Leave Request",
+        message=f"Student {current_user.full_name} has requested to leave course: {course.title}",
+        type="course"
+    )
+    db.add(notif)
+    db.commit()
+    return {"message": "Leave request submitted successfully"}
 
 # --- QUIZ ROUTES ---
 
@@ -731,3 +780,56 @@ def mark_notification_read(notif_id: int, db: Session = Depends(get_db)):
         notif.is_read = True
         db.commit()
     return {"message": "Notification updated"}
+@app.get("/teacher/leave-requests", response_model=List[schemas.LeaveRequestResponse])
+def get_leave_requests(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.user_type != 1:
+        raise HTTPException(status_code=403, detail="Only teachers can view leave requests")
+    
+    # Requests for courses owned by this teacher
+    requests = db.query(models.LeaveRequest).join(models.Course).filter(models.Course.teacher_id == current_user.id).all()
+    
+    for req in requests:
+        # Count quizzes attempted by this student in this course
+        attempt_count = db.query(models.Result).join(models.Quiz).filter(
+            models.Result.student_id == req.student_id,
+            models.Quiz.course_id == req.course_id
+        ).count()
+        req.quiz_attempts_count = attempt_count
+        
+    return requests
+
+@app.put("/leave-requests/{request_id}")
+def process_leave_request(request_id: int, status_update: dict, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.user_type != 1:
+        raise HTTPException(status_code=403, detail="Only teachers can process leave requests")
+    
+    request = db.query(models.LeaveRequest).filter_by(id=request_id).first()
+    if not request:
+        raise HTTPException(status_code=404, detail="Request not found")
+        
+    if request.course.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    new_status = status_update.get("status")
+    if new_status not in ["accepted", "declined"]:
+        raise HTTPException(status_code=400, detail="Invalid status")
+    
+    request.status = new_status
+    
+    if new_status == "accepted":
+        # Remove enrollment
+        db.query(models.Enrollment).filter_by(student_id=request.student_id, course_id=request.course_id).delete()
+        message = f"Your leave request for {request.course.title} was accepted. You have been removed from the course."
+    else:
+        message = f"Your leave request for {request.course.title} was declined."
+        
+    # Notify Student
+    notif = models.Notification(
+        user_id=request.student_id,
+        title=f"Leave Request {new_status.capitalize()}",
+        message=message,
+        type="course"
+    )
+    db.add(notif)
+    db.commit()
+    return {"message": f"Request {new_status} successfully"}
