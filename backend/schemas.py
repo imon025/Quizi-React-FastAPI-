@@ -27,6 +27,7 @@ class UserUpdate(BaseModel):
     department: Optional[str] = None
     university: Optional[str] = None
     student_id: Optional[str] = None
+    profile_picture: Optional[str] = None
 class PasswordChangeRequest(BaseModel):
     old_password: str
     new_password: str
@@ -41,6 +42,7 @@ class UserResponse(UserBase):
     degree: Optional[str] = None
     department: Optional[str] = None
     university: Optional[str] = None
+    profile_picture: Optional[str] = None
 
     class Config:
         from_attributes = True

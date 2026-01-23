@@ -22,6 +22,7 @@ class User(Base):
     # Common optional fields
     department = Column(String, nullable=True)
     university = Column(String, nullable=True)
+    profile_picture = Column(String, nullable=True)
 
     # Relationships
     taught_courses = relationship("Course", back_populates="teacher")

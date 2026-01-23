@@ -1,4 +1,7 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile
+from fastapi.staticfiles import StaticFiles
+import os
+import shutil
 from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -23,15 +26,22 @@ origins = [
     "http://127.0.0.1:5174",
     "http://localhost:5175",
     "http://127.0.0.1:5175",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Static files for profile pictures
+UPLOAD_DIR = "uploads/profile_pics"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 @app.get("/")
 def read_root():
@@ -136,6 +146,33 @@ def update_me(user_update: schemas.UserUpdate, current_user: models.User = Depen
     db.commit()
     db.refresh(current_user)
     return current_user
+
+@app.post("/auth/profile-picture")
+async def upload_profile_picture(
+    file: UploadFile = File(...),
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Verify file is an image
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+    
+    # Create unique filename
+    file_extension = os.path.splitext(file.filename)[1]
+    filename = f"user_{current_user.id}_{int(datetime.now().timestamp())}{file_extension}"
+    file_path = os.path.join(UPLOAD_DIR, filename)
+    
+    # Save file
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    
+    # Update user record
+    profile_pic_url = f"http://127.0.0.1:8000/uploads/profile_pics/{filename}"
+    current_user.profile_picture = profile_pic_url
+    db.commit()
+    db.refresh(current_user)
+    
+    return {"message": "Profile picture uploaded successfully", "url": profile_pic_url}
 
 # --- TEACHER UTILS ---
 

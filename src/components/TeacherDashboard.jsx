@@ -171,6 +171,7 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
   });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const notifRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -227,6 +228,42 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
   const [passNew, setPassNew] = useState("");
   const [passConfirm, setPassConfirm] = useState("");
   const [previousTab, setPreviousTab] = useState("dashboard");
+  const [profilePic, setProfilePic] = useState(teacherData.profile_picture);
+
+  const handleProfilePictureUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error("Please upload an image file");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch("http://127.0.0.1:8000/auth/profile-picture", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setProfilePic(data.url);
+        toast.success("Profile picture updated!");
+      } else {
+        const error = await res.json();
+        toast.error(error.detail || "Upload failed");
+      }
+    } catch (err) {
+      toast.error("Network error");
+    }
+  };
 
   useEffect(() => {
     localStorage.setItem("teacher_selectedCourse", JSON.stringify(selectedCourse));
@@ -2109,9 +2146,26 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                 }} className="flex flex-col gap-6">
 
                   <div className="flex items-center gap-4 mb-4">
-                    <div className="w-20 h-20 bg-indigo-600 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-lg shadow-indigo-600/20">
-                      {teacherData.full_name?.charAt(0)}
+                    <div
+                      className="w-20 h-20 bg-indigo-600 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-lg shadow-indigo-600/20 cursor-pointer overflow-hidden group relative"
+                      onClick={() => fileInputRef.current.click()}
+                    >
+                      {profilePic ? (
+                        <img src={profilePic} alt="Profile" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                      ) : (
+                        teacherData.full_name?.charAt(0)
+                      )}
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Pencil size={20} className="text-white" />
+                      </div>
                     </div>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      className="hidden"
+                      accept="image/*"
+                      onChange={handleProfilePictureUpload}
+                    />
                     <div>
                       <h3 className="text-xl font-bold">{teacherData.full_name}</h3>
                       <p className="text-slate-500 text-sm">{teacherData.email}</p>
