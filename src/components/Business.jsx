@@ -1,6 +1,5 @@
 import { FaStar } from "react-icons/fa";
-import { MdOutlineSecurity } from "react-icons/md";
-import { GiBanknote } from "react-icons/gi";
+import { MdOutlineSecurity, MdAnalytics } from "react-icons/md";
 import CommonButton from "./CommonButton";
 import CommonTitle from "./CommonTitle";
 
@@ -23,7 +22,7 @@ const BusinessCard = (props) => {
   );
 };
 
-const Business = () => {
+const Business = ({ onLoginClick }) => {
   return (
     <section id="features" className="font-poppins pb-10 md:py-16">
       <div className="flex items-center flex-col md:flex-row gap-10 md:gap-10 ss:gap-16 justify-between">
@@ -36,7 +35,7 @@ const Business = () => {
             ensuring that students maintain focus and academic integrity throughout
             their assessments. Effortless for teachers, secure for students.
           </p>
-          <CommonButton btnText="get started" />
+          <CommonButton btnText="get started" onClick={onLoginClick} />
         </div>
 
         <div className="flex flex-col gap-5 flex-1">
@@ -51,9 +50,9 @@ const Business = () => {
             desc="Military-grade encryption and eye-tracking ensure maximum assessment security."
           />
           <BusinessCard
-            icon={<GiBanknote />}
-            title="Zero Latency"
-            desc="Real-time monitoring and instant result generation for immediate feedback."
+            icon={<MdAnalytics />}
+            title="Real-time Analytics"
+            desc="Detailed performance tracking and instant result generation for immediate feedback."
           />
         </div>
       </div>

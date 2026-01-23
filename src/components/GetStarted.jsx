@@ -1,9 +1,9 @@
 import { HiMiniArrowUpRight } from "react-icons/hi2";
 
-const GetStarted = () => {
+const GetStarted = ({ onClick }) => {
   return (
-    <a
-      href="#features"
+    <div
+      onClick={onClick}
       className="hover:shadow-md transition-all hover:shadow-indigo-500 md:w-[140px] md:h-[140px] sm:w-[180px] sm:h-[180px] w-[90px] h-[90px] bg-blue-gradient cursor-pointer select-none capitalize font-poppins flex items-center justify-center rounded-full hover:scale-110 transition-all p-[2px]"
     >
       <div className="w-full h-full bg-slate-50 dark:bg-primary rounded-full flex items-center justify-center">
@@ -14,7 +14,7 @@ const GetStarted = () => {
           started
         </div>
       </div>
-    </a>
+    </div>
   );
 };
 

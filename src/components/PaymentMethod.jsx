@@ -14,18 +14,18 @@ const Steps = ({ title }) => {
   );
 };
 
-const PaymentMethod = () => {
+const PaymentMethod = ({ onLoginClick }) => {
   return (
     <section id="product" className="py-10 sm:py-16 font-poppins">
       <div className="flex md:flex-row flex-col gap-10">
         <div className="flex flex-col gap-7 sm:gap-10 flex-1">
-          <CommonTitle title="Find a better card deal in few easy steps." />
+          <CommonTitle title="Manage your quizzes in few easy steps." />
           <div className="flex flex-col gap-3">
-            <Steps title="Choose the carding type that suits your needs" />
-            <Steps title="Don't double entry, interconnect to your accounting system" />
-            <Steps title="Speed up month-end closing with a rigorous invoicing process" />
+            <Steps title="Create customized quizzes for any subject or course" />
+            <Steps title="Real-time proctoring with AI-driven eye-tracking" />
+            <Steps title="Automated grading and detailed performance analytics" />
           </div>
-          <CommonButton btnText="get started" />
+          <CommonButton btnText="get started" onClick={onLoginClick} />
         </div>
 
         <div className="flex-1">

@@ -85,16 +85,16 @@ const App = () => {
           <ScrollTop />
           <div className="container px-5 md:px-10 mx-auto">
             <Hero onLoginClick={() => setShowAccount(true)} />
-            <div className="flex flex-col xs:flex-row flex-wrap items-center justify-between gap-6 md:gap-2 py-20">
-              <Stats number="3800" title="ACTIVE STUDENT & TEACHER" />
-              <Stats number="230" title="Total Courses" />
-              <Stats number="$230M" title="Total Users" />
+            <div className="flex flex-col xs:flex-row flex-wrap items-center justify-between gap-10 py-20 w-full">
+              <Stats end={3800} title="ACTIVE STUDENT & TEACHER" suffix="+" />
+              <Stats end={230} title="Total Courses" suffix="+" />
+              <Stats end={230} title="Total Users" prefix="$" suffix="M+" />
             </div>
-            <Business />
+            <Business onLoginClick={() => setShowAccount(true)} />
             <Bill />
-            <PaymentMethod />
+            <PaymentMethod onLoginClick={() => setShowAccount(true)} />
             <Testimonials />
-            <ServiceCard />
+            <ServiceCard onLoginClick={() => setShowAccount(true)} />
             <Footer />
           </div>
 

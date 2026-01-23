@@ -23,7 +23,7 @@ export const testimonials = [
   {
     id: "1",
     about:
-      "Money is only a tool. It will take you wherever you wish, but it will not replace you as the driver.",
+      "Quizi has completely transformed how we conduct assessments. The eye-tracking technology provides a level of security we never had before.",
     image: person1,
     name: "Imon Farazi",
     title: "Founder & Leader",
@@ -31,18 +31,18 @@ export const testimonials = [
   {
     id: "2",
     about:
-      "Money makes your life easier. If you're lucky to have it, you're lucky.",
+      "The real-time monitoring and automated grading save us hours of work every week. It's the most efficient quiz system I've ever used.",
     image: person2,
     name: "Steve Smith",
-    title: "CEO",
+    title: "Professor",
   },
   {
     id: "3",
     about:
-      "It is usually people in the money business and international trade that are really rich.",
+      "Our students find the interface intuitive, and as educators, we have peace of mind knowing the assessments are fair and secure.",
     image: person3,
     name: "Jasmine Florence",
-    title: "Founder & Leader",
+    title: "Academic Coordinator",
   },
 ];
 

@@ -21,9 +21,7 @@ const Hero = ({ onLoginClick }) => {
 
             {/* Desktop Get Started */}
             <div className="ss:flex hidden md:mr-4 mr-0">
-              <div onClick={onLoginClick}>
-                <GetStarted />
-              </div>
+              <GetStarted onClick={onLoginClick} />
             </div>
           </div>
 
@@ -39,9 +37,7 @@ const Hero = ({ onLoginClick }) => {
 
           {/* Mobile Get Started */}
           <div className="absolute -top-4 left-5 sm:left-[60px] md:hidden">
-            <div onClick={onLoginClick}>
-              <GetStarted />
-            </div>
+            <GetStarted onClick={onLoginClick} />
           </div>
         </div>
       </section>

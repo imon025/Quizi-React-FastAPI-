@@ -4,7 +4,7 @@ import { TbBrandMeta, TbBrandHbo } from "react-icons/tb";
 import CommonTitle from "./CommonTitle";
 import CommonButton from "./CommonButton";
 
-const ServiceCard = () => {
+const ServiceCard = ({ onLoginClick }) => {
   return (
     <section className="font-poppins md:py-16 py-10">
       <div className="flex flex-col gap-10">
@@ -22,12 +22,12 @@ const ServiceCard = () => {
           <div>
             <CommonTitle title="Let's try our service now!" />
             <p className="max-w-[470px] mt-4 sm:mt-8">
-              Everything you need to accept card payments and grow your business
-              anywhere on the planet. Get Started
+              Everything you need to host secure, distraction-free assessments
+              and monitor student progress in real-time. Join Quizi today!
             </p>
           </div>
           <div>
-            <CommonButton btnText="get started" />
+            <CommonButton btnText="get started" onClick={onLoginClick} />
           </div>
         </div>
       </div>

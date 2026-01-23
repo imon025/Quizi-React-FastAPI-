@@ -18,7 +18,7 @@ const SocialMedia = ({ icon, name }) => {
 const Footer = () => {
   const date = new Date().getFullYear();
   return (
-    <section className="relative font-poppins pb-10 sm:pb-16">
+    <section id="contact" className="relative font-poppins pb-10 sm:pb-16">
       <div className="flex items-start md:flex-row flex-col gap-10 md:gap-24">
         <div className="md:max-w-[370px]">
           <h2 className="text-3xl">Imon Farazi</h2>
