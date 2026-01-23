@@ -643,11 +643,16 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
             const totalQuizzesAcrossCourses = myCourses.reduce((acc, c) => acc + (c.quiz_count || 0), 0);
             const pendingCount = Math.max(0, totalQuizzesAcrossCourses - attemptedQuizIds.size);
 
-            // Overall Progress: Passed courses (at least one quiz passed) / Total enrolled
-            // For simplicity, let's use: (courses with at least one attempt) / Total enrolled
-            const attemptedCourseIds = new Set(results.map(r => r.quiz?.course_id));
+            // Overall Progress: (courses with at least one attempt) / Total enrolled
+            // Filter to only include currently enrolled courses
+            const enrolledCourseIds = new Set(myCourses.map(c => c.id));
+            const attemptedCourseIds = new Set(
+              results
+                .filter(r => r.quiz && enrolledCourseIds.has(r.quiz.course_id))
+                .map(r => r.quiz.course_id)
+            );
             const progress = myCourses.length > 0
-              ? Math.round((attemptedCourseIds.size / myCourses.length) * 100)
+              ? Math.min(100, Math.round((attemptedCourseIds.size / myCourses.length) * 100))
               : 0;
 
             // Weekly Productivity (Last 7 Days Attempts)
