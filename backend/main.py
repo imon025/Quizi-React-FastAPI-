@@ -217,6 +217,7 @@ def get_my_students(current_user: models.User = Depends(get_current_user), db: S
             # Let's create a composite object
             students_data.append({
                 "student_id": student.id,
+                "course_id": course.id,
                 "full_name": student.full_name,
                 "email": student.email,
                 "course_title": course.title,
@@ -833,3 +834,33 @@ def process_leave_request(request_id: int, status_update: dict, current_user: mo
     db.add(notif)
     db.commit()
     return {"message": f"Request {new_status} successfully"}
+
+@app.delete("/teacher/courses/{course_id}/students/{student_id}")
+def kick_student_from_course(course_id: int, student_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.user_type != 1:
+        raise HTTPException(status_code=403, detail="Only teachers can remove students")
+    
+    course = db.query(models.Course).filter_by(id=course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+        
+    if course.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only remove students from your own courses")
+    
+    enrollment = db.query(models.Enrollment).filter_by(student_id=student_id, course_id=course_id).first()
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="Student is not enrolled in this course")
+    
+    db.delete(enrollment)
+    
+    # Notify Student
+    notif = models.Notification(
+        user_id=student_id,
+        title="Removed from Course",
+        message=f"You have been removed from the course: {course.title}",
+        type="course"
+    )
+    db.add(notif)
+    db.commit()
+    
+    return {"message": "Student removed from course successfully"}

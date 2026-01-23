@@ -232,6 +232,18 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
   const [previousTab, setPreviousTab] = useState("dashboard");
   const [profilePic, setProfilePic] = useState(teacherData.profile_picture);
   const [leaveRequestFilter, setLeaveRequestFilter] = useState('pending');
+  const [kickingStudentId, setKickingStudentId] = useState(null);
+  const [kickCountdown, setKickCountdown] = useState(0);
+
+  useEffect(() => {
+    let timer;
+    if (kickingStudentId && kickCountdown > 0) {
+      timer = setInterval(() => {
+        setKickCountdown(prev => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [kickingStudentId, kickCountdown]);
 
   const handleProfilePictureUpload = async (e) => {
     const file = e.target.files[0];
@@ -285,6 +297,30 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
       } else {
         const error = await res.json();
         toast.error(error.detail || "Delete failed");
+      }
+    } catch (err) {
+      toast.error("Network error");
+    }
+  };
+
+  const handleKickStudent = async (courseId, studentId) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`http://127.0.0.1:8000/teacher/courses/${courseId}/students/${studentId}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || "Student removed successfully");
+        // We need a way to refresh student list
+        const headers = { "Authorization": `Bearer ${token}` };
+        const studentsRes = await fetch("http://127.0.0.1:8000/teacher/students", { headers });
+        if (studentsRes.ok) {
+          setMyStudents(await studentsRes.json());
+        }
+      } else {
+        toast.error(data.detail || "Action failed");
       }
     } catch (err) {
       toast.error("Network error");
@@ -2132,6 +2168,7 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                         <th className="p-4 font-bold">Enrolled Course</th>
                         <th className="p-4 font-bold">Code</th>
                         <th className="p-4 font-bold">Joined At</th>
+                        <th className="p-4 font-bold text-center">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2155,6 +2192,47 @@ export default function TeacherDashboard({ teacherData, onLogout }) {
                             <span className="font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded inline-block">{s.course_code}</span>
                           </td>
                           <td className="p-4 text-xs text-gray-500">{new Date(s.enrolled_at).toLocaleDateString()}</td>
+                          <td className="p-4 text-center">
+                            {kickingStudentId === `${s.student_id}_${s.course_id}` ? (
+                              <div className="flex items-center justify-center gap-2">
+                                {kickCountdown > 0 ? (
+                                  <button disabled className="px-3 py-1.5 bg-red-500/10 text-red-500 rounded-lg text-xs font-bold animate-pulse">
+                                    Confirm in {kickCountdown}s
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      handleKickStudent(s.course_id, s.student_id);
+                                      setKickingStudentId(null);
+                                    }}
+                                    className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-bold hover:bg-red-700 shadow-md shadow-red-900/20"
+                                  >
+                                    Confirm Kick
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => {
+                                    setKickingStudentId(null);
+                                    setKickCountdown(0);
+                                  }}
+                                  className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white"
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setKickingStudentId(`${s.student_id}_${s.course_id}`);
+                                  setKickCountdown(3);
+                                }}
+                                className="px-3 py-1.5 text-red-500 hover:bg-red-500/10 border border-red-500/20 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all"
+                                title="Remove student from course"
+                              >
+                                Kick
+                              </button>
+                            )}
+                          </td>
                         </tr>
                       ))}
                       {(
