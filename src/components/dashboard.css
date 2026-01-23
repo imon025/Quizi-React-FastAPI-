@@ -332,13 +332,27 @@
 .btn-secondary {
   background: var(--border-color);
   color: var(--text-primary);
-  border: none;
+  border: 1px solid transparent;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .btn-secondary:hover {
-  background: rgba(148, 163, 184, 0.2);
+  background: var(--bg-primary);
+  border-color: var(--border-color);
+  transform: translateY(-1px);
+}
+
+:root[data-theme='light'] .btn-secondary {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+:root[data-theme='light'] .btn-secondary:hover {
+  background: #fff;
+  color: #0f172a;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .modal-overlay {

@@ -180,6 +180,8 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
   const [passConfirm, setPassConfirm] = useState("");
   const [previousTab, setPreviousTab] = useState("dashboard");
   const [profilePic, setProfilePic] = useState(studentData.profile_picture);
+  const [showQuizDetailsModal, setShowQuizDetailsModal] = useState(false);
+  const [selectedQuizForDetails, setSelectedQuizForDetails] = useState(null);
 
   const handleProfilePictureUpload = async (e) => {
     const file = e.target.files[0];
@@ -516,7 +518,7 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
                     </div>
                     <div className="max-h-96 overflow-y-auto">
                       {notifications.length > 0 ? notifications.map(n => (
-                        <div key={n.id} className="relative group overflow-hidden border-b border-slate-800/50 last:border-0 bg-white dark:bg-slate-900">
+                        <div key={n.id} className="relative group overflow-hidden border-b border-borderColor last:border-0 bg-cardBg">
                           {/* Swipeable Container */}
                           <div className="flex transition-transform duration-300 ease-out hover:-translate-x-16">
                             <div
@@ -660,8 +662,8 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
                   <div className="chart-card">
                     <div className="flex justify-between items-center mb-6">
                       <div>
-                        <h2 className="chart-title mb-0">Weekly Productivity</h2>
-                        <p className="text-xs text-slate-500">Quiz attempts by day of week</p>
+                        <h2 className="chart-title mb-0 text-slate-900 dark:text-white">Weekly Productivity</h2>
+                        <p className="text-xs text-slate-600 dark:text-slate-500">Quiz attempts by day of week</p>
                       </div>
                     </div>
                     <BarChart data={productivityData} labels={dayLabels} color="#6366f1" />
@@ -669,8 +671,8 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
                   <div className="chart-card">
                     <div className="flex justify-between items-center mb-6">
                       <div>
-                        <h2 className="chart-title mb-0">Quiz Scores</h2>
-                        <p className="text-xs text-slate-500">Performance (Percentage) of last 5 attempts</p>
+                        <h2 className="chart-title mb-0 text-slate-900 dark:text-white">Quiz Scores</h2>
+                        <p className="text-xs text-slate-600 dark:text-slate-500">Performance (Percentage) of last 5 attempts</p>
                       </div>
                     </div>
                     <MiniLineChart data={scoreData} labels={scoreLabels} />
@@ -687,16 +689,16 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
                   <h2 className="text-2xl font-bold">Discover Courses</h2>
                   <p className="text-muted text-sm mt-1">Join new courses using the keys provided by your instructors</p>
                 </div>
-                <div className="px-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl text-sm font-bold text-slate-700 dark:text-gray-300 border border-slate-200 dark:border-slate-700">
-                  <span className="text-indigo-400 font-bold">{courses.length}</span> Courses Found
+                <div className="px-4 py-2 bg-cardBg rounded-xl text-sm font-bold text-slate-700 dark:text-gray-300 border border-borderColor shadow-sm">
+                  <span className="text-indigo-600 dark:text-indigo-400 font-black">{courses.length}</span> Courses Found
                 </div>
               </div>
 
               {fetchError ? (
                 <div className="py-20 text-center bg-red-500/5 rounded-[3rem] border-2 border-dashed border-red-500/20">
-                  <ShieldAlert size={48} className="mx-auto mb-4 text-red-400" />
-                  <p className="text-xl font-bold text-red-500">Data Access Error</p>
-                  <p className="text-sm text-red-400 mt-2">{fetchError}</p>
+                  <ShieldAlert size={48} className="mx-auto mb-4 text-red-500" />
+                  <p className="text-xl font-bold text-red-600">Data Access Error</p>
+                  <p className="text-sm text-red-500 mt-2">{fetchError}</p>
                   <button onClick={() => window.location.reload()} className="mt-8 btn-primary px-8 py-3 rounded-2xl">Retry Connection</button>
                 </div>
               ) : courses.length > 0 ? (
@@ -704,20 +706,20 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
                   {courses.map(course => {
                     const isEnrolled = myCourses.some(mc => mc.id === course.id);
                     return (
-                      <div key={course.id} className="chart-card flex flex-col justify-between group hover:border-indigo-500/50 transition-all p-8 rounded-3xl">
+                      <div key={course.id} className="chart-card flex flex-col justify-between group hover:border-indigo-500/50 transition-all p-8 rounded-3xl shadow-sm">
                         <div>
                           <div className="flex justify-between items-start mb-4">
-                            <div className="w-12 h-12 bg-indigo-500/10 text-indigo-400 rounded-2xl flex items-center justify-center font-black transition-transform group-hover:scale-110">
+                            <div className="w-12 h-12 bg-indigo-500/10 text-indigo-500 rounded-2xl flex items-center justify-center font-black transition-transform group-hover:scale-110">
                               {course.course_code.substring(0, 2).toUpperCase()}
                             </div>
-                            <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-gray-400 px-2 py-1 rounded uppercase font-bold tracking-widest border border-slate-200 dark:border-slate-700">{course.course_code}</span>
+                            <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-gray-400 px-2 py-1 rounded uppercase font-bold tracking-widest border border-slate-200 dark:border-slate-700">{course.course_code}</span>
                           </div>
-                          <h3 className="text-xl font-bold mb-2 group-hover:text-indigo-400 transition-colors">{course.title}</h3>
-                          <p className="text-gray-400 text-sm mb-6 line-clamp-3 leading-relaxed">{course.description}</p>
+                          <h3 className="text-xl font-bold mb-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors text-slate-900 dark:text-white">{course.title}</h3>
+                          <p className="text-slate-500 dark:text-gray-400 text-sm mb-6 line-clamp-3 leading-relaxed">{course.description}</p>
                         </div>
                         {isEnrolled ? (
-                          <button className="w-full bg-slate-50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 py-3 rounded-2xl font-bold cursor-default flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-800">
-                            <CheckCircle size={16} /> Enrolled
+                          <button className="w-full bg-slate-100 dark:bg-slate-800/50 text-slate-500 dark:text-slate-500 py-3 rounded-2xl font-bold cursor-default flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-800">
+                            <CheckCircle size={16} className="text-green-600 dark:text-green-500" /> Enrolled
                           </button>
                         ) : (
                           <button
@@ -840,6 +842,7 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
                       course={course}
                       results={results}
                       onTakeQuiz={(quiz) => { setSelectedQuiz(quiz); setShowKeyModal(true); }}
+                      onShowDetails={(quiz) => { setSelectedQuizForDetails(quiz); setShowQuizDetailsModal(true); }}
                       statusFilter={selectedQuizStatusFilter}
                     />
                   ))
@@ -945,7 +948,7 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
                     <X size={24} className="text-slate-500" />
                   </button>
                 </div>
-                <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl">
+                <div className="chart-card p-8 rounded-3xl shadow-xl">
                   <form onSubmit={async (e) => {
                     e.preventDefault();
                     const formData = new FormData(e.target);
@@ -1258,11 +1261,106 @@ export default function StudentDashboard({ studentData = {}, onLogout }) {
           </div>
         )
       }
+
+      {/* Quiz Details Modal */}
+      {showQuizDetailsModal && selectedQuizForDetails && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[200] p-4">
+          <div className="bg-slate-900 border border-slate-800 p-8 rounded-[2.5rem] w-full max-w-2xl shadow-2xl animate-in zoom-in duration-300">
+            <div className="flex justify-between items-start mb-8">
+              <div className="flex gap-4 items-center">
+                <div className="p-4 bg-indigo-500/10 text-indigo-400 rounded-2xl">
+                  <BookOpen size={32} />
+                </div>
+                <div>
+                  <h2 className="text-3xl font-black text-white">{selectedQuizForDetails.title}</h2>
+                  <p className="text-indigo-400 font-bold uppercase tracking-widest text-xs mt-1">Quiz Details & Requirements</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowQuizDetailsModal(false)}
+                className="p-2 hover:bg-white/5 rounded-full transition text-gray-500 hover:text-white"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              <div className="bg-cardBg p-6 rounded-3xl border border-borderColor">
+                <p className="text-[10px] font-black uppercase text-slate-600 dark:text-slate-500 mb-4 tracking-widest">Timing & Scoring</p>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2"><Clock size={14} /> Duration</span>
+                    <span className="text-sm font-bold text-slate-900 dark:text-white">{selectedQuizForDetails.duration} Minutes</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2"><Award size={14} /> Points</span>
+                    <span className="text-sm font-bold text-slate-900 dark:text-white">{selectedQuizForDetails.total_marks} Marks</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2"><CheckCircle size={14} /> Passing Mark</span>
+                    <span className="text-sm font-bold text-green-600 dark:text-green-400">{selectedQuizForDetails.passing_marks} Marks</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-cardBg p-6 rounded-3xl border border-borderColor">
+                <p className="text-[10px] font-black uppercase text-slate-600 dark:text-slate-500 mb-4 tracking-widest">Security Settings</p>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2"><Shield size={14} /> Proctoring</span>
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400">
+                      {selectedQuizForDetails.eye_tracking_enabled ? "Active" : "Standard"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2"><Layers size={14} /> Shuffle</span>
+                    <span className="text-sm font-bold text-slate-900 dark:text-white">{selectedQuizForDetails.shuffle_questions ? "Enabled" : "Disabled"}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2"><ShieldAlert size={14} /> Violation Limit</span>
+                    <span className="text-sm font-bold text-red-600 dark:text-red-400">{selectedQuizForDetails.violation_limit} Warns</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-8">
+              <p className="text-[10px] font-black uppercase text-slate-600 dark:text-slate-500 mb-3 tracking-widest">Description</p>
+              <div className="bg-cardBg p-6 rounded-3xl border border-borderColor">
+                <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed italic">
+                  {selectedQuizForDetails.description || "No additional instructions provided for this quiz."}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <button
+                className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-4 rounded-2xl font-bold transition"
+                onClick={() => setShowQuizDetailsModal(false)}
+              >
+                Close
+              </button>
+              {!results.some(r => r.quiz_id === selectedQuizForDetails.id) && (
+                <button
+                  className="flex-1 btn-primary py-4 rounded-2xl font-bold shadow-lg shadow-indigo-600/20"
+                  onClick={() => {
+                    setShowQuizDetailsModal(false);
+                    setSelectedQuiz(selectedQuizForDetails);
+                    setShowKeyModal(true);
+                  }}
+                >
+                  Confirm & Take Quiz
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div >
   );
 }
 
-function QuizGroup({ course, results, onTakeQuiz, statusFilter }) {
+function QuizGroup({ course, results, onTakeQuiz, onShowDetails, statusFilter }) {
   const [quizzes, setQuizzes] = useState([]);
 
   useEffect(() => {
@@ -1320,8 +1418,14 @@ function QuizGroup({ course, results, onTakeQuiz, statusFilter }) {
             )}
           </div>
 
-          <div className="border-t border-slate-800 pt-4">
-            <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2">About this quiz</p>
+          <div
+            className="border-t border-slate-800 pt-4 cursor-pointer hover:bg-indigo-500/5 transition-colors -mx-6 px-6"
+            onClick={() => onShowDetails(quiz)}
+          >
+            <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2 flex justify-between">
+              About this quiz
+              <span className="text-indigo-400 group-hover:translate-x-1 transition-transform">View Full Details →</span>
+            </p>
             <p className="text-sm text-gray-400 leading-relaxed italic line-clamp-2">
               {quiz.description || "No description provided for this quiz."}
             </p>
@@ -1382,15 +1486,15 @@ function AttemptHistory({ results }) {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Attempt History</h2>
-          <p className="text-slate-500 mt-1">Review your previously submitted answers</p>
+          <p className="text-slate-600 dark:text-slate-400 mt-1">Review your previously submitted answers</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="flex flex-col gap-2">
-          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Filter by Course</label>
+          <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 ml-1">Filter by Course</label>
           <select
-            className="input-field p-4 rounded-2xl bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 font-bold"
+            className="input-field p-4 rounded-2xl font-bold"
             value={selectedCourse}
             onChange={(e) => { setSelectedCourse(e.target.value); setSelectedQuiz(""); }}
           >
@@ -1400,9 +1504,9 @@ function AttemptHistory({ results }) {
         </div>
 
         <div className="flex flex-col gap-2">
-          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Select Quiz Attempt</label>
+          <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 ml-1">Select Quiz Attempt</label>
           <select
-            className="input-field p-4 rounded-2xl bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 font-bold"
+            className="input-field p-4 rounded-2xl font-bold"
             value={selectedQuiz}
             onChange={(e) => setSelectedQuiz(e.target.value)}
             disabled={!selectedCourse && filteredQuizzes.length === 0}
@@ -1441,7 +1545,7 @@ function AttemptHistory({ results }) {
                 key={type}
                 onClick={() => setActiveTab(type)}
                 className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === type
-                  ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                  ? "bg-cardBg text-indigo-600 dark:text-indigo-400 shadow-sm"
                   : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                   }`}
               >
@@ -1460,7 +1564,7 @@ function AttemptHistory({ results }) {
                 const feedback = selectedResult.feedback?.[q.id];
 
                 return (
-                  <div key={q.id} className="bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
+                  <div key={q.id} className="chart-card p-8 rounded-3xl shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex justify-between items-start mb-6">
                       <span className="bg-slate-100 dark:bg-slate-900 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">Question {idx + 1}</span>
                       {activeTab !== "description" && (
@@ -2060,7 +2164,7 @@ function QuizSession({ quiz, questions, onFinish }) {
             <p className="text-sm text-indigo-600 dark:text-indigo-400">Scroll down to review and submit your answers.</p>
           </div>
           {/* Tabs */}
-          <div className="flex gap-2 p-1 bg-white dark:bg-slate-900 rounded-xl shadow-sm">
+          <div className="flex gap-2 p-1 bg-cardBg rounded-xl shadow-sm">
             {[{ id: 'mcq', label: 'MCQ' }, { id: 'true_false', label: 'T/F' }, { id: 'description', label: 'Description' }].map(tab => (
               <button
                 key={tab.id}
@@ -2166,15 +2270,17 @@ function QuizSession({ quiz, questions, onFinish }) {
 function StatCard({ title, value, trend, icon, onClick }) {
   return (
     <div
-      className={`stat-card ${onClick ? "cursor-pointer hover:border-indigo-500 transition-all" : ""}`}
+      className={`stat-card group ${onClick ? "cursor-pointer hover:border-indigo-500/50 transition-all active:scale-[0.98]" : ""} shadow-sm`}
       onClick={onClick}
     >
       <div className="flex flex-col">
-        <p className="stat-title">{title}</p>
-        <p className="stat-value">{value}</p>
-        <p className="stat-trend positive">{trend}</p>
+        <p className="stat-title text-slate-600 dark:text-slate-400 font-bold uppercase tracking-widest text-[10px]">{title}</p>
+        <p className="stat-value text-slate-900 dark:text-white font-black">{value}</p>
+        <p className="stat-trend positive bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded text-[10px] font-bold w-fit mt-1">{trend}</p>
       </div>
-      <div className="stat-icon">{icon}</div>
+      <div className="stat-icon bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 p-3 rounded-2xl group-hover:scale-110 transition-transform">
+        {icon}
+      </div>
     </div>
   );
 }

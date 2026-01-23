@@ -11,6 +11,8 @@ module.exports = {
         dimBlue: "var(--dimBlue)",
         textPrimary: "var(--text-primary)",
         bgPrimary: "var(--bg-primary)",
+        cardBg: "var(--card-bg)",
+        borderColor: "var(--border-color)",
       },
       fontFamily: {
         poppins: ["Poppins", "sans-serif"],
@@ -25,5 +27,6 @@ module.exports = {
       xl: "1700px",
     },
   },
+  darkMode: "class",
   plugins: [],
 };

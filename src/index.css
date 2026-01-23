@@ -9,10 +9,11 @@
   --secondary: #4f46e5;
   --dimWhite: #475569;
   --dimBlue: rgba(79, 70, 229, 0.05);
-  --bg-primary: #f8fafc;
+  --bg-primary: #f1f5f9;
   --text-primary: #0f172a;
+  --text-secondary: #475569;
   --card-bg: #ffffff;
-  --border-color: #e2e8f0;
+  --border-color: #cbd5e1;
 }
 
 :root[data-theme='dark'] {

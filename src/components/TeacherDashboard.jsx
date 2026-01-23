@@ -3440,15 +3440,17 @@ function SidebarItem({ icon, label, active, onClick }) {
 function StatCard({ title, value, trend, icon, onClick }) {
   return (
     <div
-      className={`stat-card ${onClick ? 'cursor-pointer hover:border-indigo-500' : ''}`}
+      className={`stat-card group ${onClick ? "cursor-pointer hover:border-indigo-500/50 transition-all active:scale-[0.98]" : ""} shadow-sm`}
       onClick={onClick}
     >
       <div className="flex flex-col">
-        <p className="stat-title">{title}</p>
-        <p className="stat-value">{value}</p>
-        <p className="stat-trend positive">{trend}</p>
+        <p className="stat-title text-slate-600 dark:text-slate-400 font-bold uppercase tracking-widest text-[10px]">{title}</p>
+        <p className="stat-value text-slate-900 dark:text-white font-black">{value}</p>
+        <p className="stat-trend positive bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded text-[10px] font-bold w-fit mt-1">{trend}</p>
       </div>
-      <div className="stat-icon">{icon}</div>
+      <div className="stat-icon bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 p-3 rounded-2xl group-hover:scale-110 transition-transform">
+        {icon}
+      </div>
     </div>
   );
 }
@@ -3502,7 +3504,7 @@ function QuestionList({ quizId, refreshKey, onEdit, onDelete }) {
       </div>
 
       {filteredQuestions.map((q, index) => (
-        <div key={q.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 rounded-3xl shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+        <div key={q.id} className="chart-card p-8 rounded-3xl shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
           {/* Points Badge */}
           <div className="absolute top-0 right-0 bg-indigo-600 text-white px-4 py-1 rounded-bl-2xl text-[10px] font-bold uppercase tracking-widest shadow-sm">
             {q.point_value || 1} {q.point_value === 1 ? 'Point' : 'Points'}

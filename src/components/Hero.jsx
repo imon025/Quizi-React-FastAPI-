@@ -8,11 +8,11 @@ const Hero = ({ onLoginClick }) => {
     <>
       <section
         id="home"
-        className="flex md:items-center flex-col md:flex-row gap-10 md:gap-0"
+        className="flex md:items-center flex-col md:flex-row gap-10 md:gap-0 min-h-[70vh] py-10"
       >
         <div className="flex flex-col gap-5 flex-1 pr-10 md:pr-0">
-          <div className="relative">
-            <h1 className="text-[3.3rem] sm:text-6xl leading-snug sm:leading-normal md:text-7xl md:leading-snug font-[600] font-poppins">
+          <div className="relative flex flex-row justify-between items-center w-full">
+            <h1 className="flex-1 text-[3.3rem] sm:text-6xl leading-snug sm:leading-normal md:text-7xl md:leading-snug font-[600] font-poppins text-slate-900 dark:text-white">
               "A Silent & Secure <br className="md:block hidden" />
               <span className="text-gradient">Online Quiz </span>
               <br className="md:block hidden" />
@@ -20,14 +20,14 @@ const Hero = ({ onLoginClick }) => {
             </h1>
 
             {/* Desktop Get Started */}
-            <div className="absolute top-0 left-[350px] md:left-[400px] md:block hidden">
+            <div className="ss:flex hidden md:mr-4 mr-0">
               <div onClick={onLoginClick}>
                 <GetStarted />
               </div>
             </div>
           </div>
 
-          <p className="text-base sm:text-lg md:text-xl text-dimWhite sm:mt-5 md:max-w-[470px]">
+          <p className="text-base sm:text-lg md:text-xl text-slate-600 dark:text-dimWhite sm:mt-5 md:max-w-[470px]">
             Quizi is a silent and secure online quiz system that uses eye-tracking
             technology to ensure focus, fairness, and a distraction-free
             assessment experience.

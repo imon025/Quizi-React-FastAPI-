@@ -94,14 +94,14 @@ const AccountForm = ({ setShowAccount, onLogin }) => {
   };
 
   const mandatoryInput =
-    "bg-gray-800 border border-gray-700 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition placeholder-gray-500 text-white w-full text-sm";
+    "bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition placeholder-gray-400 dark:placeholder-gray-500 text-slate-900 dark:text-white w-full text-sm";
 
   const optionalInput =
-    "bg-gray-800 border border-gray-700 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition placeholder-gray-500 text-white w-full text-sm";
+    "bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition placeholder-gray-400 dark:placeholder-gray-500 text-slate-900 dark:text-white w-full text-sm";
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-start pt-16 z-50 overflow-auto">
-      <div className="bg-gray-900 rounded-2xl w-[650px] p-10 relative shadow-lg border border-gray-700">
+    <div className="fixed inset-0 bg-black/70 flex justify-center items-start pt-16 z-[200] overflow-auto backdrop-blur-sm">
+      <div className="bg-slate-50 dark:bg-gray-900 rounded-2xl w-[650px] p-10 relative shadow-2xl border border-slate-200 dark:border-gray-700 animate-in zoom-in duration-300">
         {/* Close button */}
         <button
           className="absolute top-4 right-4 text-2xl font-bold text-gray-400 hover:text-red-500 transition"
@@ -111,7 +111,7 @@ const AccountForm = ({ setShowAccount, onLogin }) => {
         </button>
 
         {/* Tabs */}
-        <div className="flex justify-center gap-6 mb-5 border-b border-gray-700 pb-2 text-sm">
+        <div className="flex justify-center gap-6 mb-5 border-b border-slate-200 dark:border-gray-700 pb-2 text-sm">
           <button
             className={`font-medium pb-1 transition ${isLogin
               ? "border-b-2 border-blue-500 text-blue-400"
@@ -168,8 +168,8 @@ const AccountForm = ({ setShowAccount, onLogin }) => {
                 <button
                   type="button"
                   className={`flex-1 py-3 rounded-lg font-medium transition ${userType === "student"
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                    ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
+                    : "bg-white dark:bg-gray-800 text-slate-500 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-700 border border-slate-200 dark:border-transparent"
                     }`}
                   onClick={() => setUserType("student")}
                 >
@@ -178,8 +178,8 @@ const AccountForm = ({ setShowAccount, onLogin }) => {
                 <button
                   type="button"
                   className={`flex-1 py-3 rounded-lg font-medium transition ${userType === "teacher"
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                    ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
+                    : "bg-white dark:bg-gray-800 text-slate-500 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-700 border border-slate-200 dark:border-transparent"
                     }`}
                   onClick={() => setUserType("teacher")}
                 >
@@ -276,9 +276,9 @@ const AccountForm = ({ setShowAccount, onLogin }) => {
 
           <button
             type="submit"
-            className="bg-blue-500 text-white p-3 rounded-lg mt-3 font-medium hover:bg-blue-600 transition-all shadow-sm text-sm w-full"
+            className="bg-blue-600 text-white p-3 rounded-lg mt-3 font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 text-sm w-full"
           >
-            {isLogin ? "Login" : "Create Account"}
+            {isLogin ? "Login Now" : "Create Account"}
           </button>
         </form>
 
