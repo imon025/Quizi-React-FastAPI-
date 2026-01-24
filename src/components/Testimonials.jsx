@@ -8,11 +8,6 @@ const Testimonials = () => {
         <div className="flex justify-center">
           <CommonTitle title="ABOUT US" />
         </div>
-        <CommonTitle title="What Educators are saying about us" />
-        <p className="text-dimWhite md:text-lg text-base">
-          Quizi is trusted by educational institutions worldwide for its innovative
-          approach to digital assessments and secure academic integrity.
-        </p>
         <div className="grid ss:grid-cols-2 md:grid-cols-3 gap-10 ss:gap-5 sm:gap-10 mt-10 sm:mt-16">
           {testimonials.map((item) => {
             const { id, about, image, name, title } = item;
